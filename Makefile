@@ -138,6 +138,10 @@ clean-all: clean
 	rm -rf $(OUTPUT_DIR)/*
 	@echo "✓ Cleaned output directory"
 
+clean-out:
+	rm -f output/*bmp output/cells/* output/grids/* output/words/*
+	@echo "✓ Cleaned outputs"
+
 # ============================
 # Help
 # ============================

@@ -14,6 +14,7 @@
 #include "src/extraction/slice_words.h"
 
 int main(int argc, char** argv) {
+    
     if (argc < 2) {
         fprintf(stderr, "Usage: %s <input.bmp>\n", argv[0]);
         fprintf(stderr, "Example: %s data/test1.bmp\n", argv[0]);
