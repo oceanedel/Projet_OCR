@@ -2,7 +2,7 @@
 
 # Compiler and flags
 CC := gcc
-CFLAGS := -Wall -Wextra -O2 -I. -Ifundamentals -Iproficiencies #-fsanitize=address -g
+CFLAGS := -Wall -Wextra -O2 -I. -Ifundamentals -Iproficiencies -fsanitize=address -g
 LDFLAGS := -lm
 SDLFLAGS := -lSDL2
 
@@ -15,7 +15,7 @@ BINDIR := bin
 TARGET := main
 
 # Source files (relative paths)
-SRC := main.c $(SRCDIR)/inkpaper.c
+SRC := main.c $(SRCDIR)/inkpaper.c $(SRCDIR)/grid.c
 
 # Object files (map each .c to obj/*.o)
 OBJ := $(patsubst %.c,$(OBJDIR)/%.o,$(notdir $(SRC)))
