@@ -2,51 +2,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include <string.h>
-#include <math.h>
 
 static inline bool is_black(uint32_t px) {
     return ((px & 0x00FFFFFF) == 0);
-}
-
-static int* malloc_int(int n) {
-    int* p = (int*)malloc(sizeof(int) * n);
-    if (!p) { fprintf(stderr, "alloc fail\n"); exit(1); }
-    return p;
-}
-
-static void find_bands_int(const int* prof, int N, int thr, int** outBands, int* outCount) {
-    int cap = 16, cnt = 0;
-    int* bands = (int*)malloc(sizeof(int) * cap * 2);
-    int i = 0;
-    while (i < N) {
-        if (prof[i] >= thr) {
-            int s = i;
-            while (i < N && prof[i] >= thr) i++;
-            int e = i - 1;
-            if (cnt >= cap) {
-                cap *= 2;
-                bands = (int*)realloc(bands, sizeof(int) * cap * 2);
-            }
-            bands[2 * cnt + 0] = s;
-            bands[2 * cnt + 1] = e;
-            cnt++;
-        } else {
-            i++;
-        }
-    }
-    *outBands = bands;
-    *outCount = cnt;
-}
-
-static void bands_to_centers(const int* bands, int nBands, int** outCenters, int* outN) {
-    int* centers = malloc_int(nBands);
-    for (int i = 0; i < nBands; i++) {
-        int s = bands[2 * i + 0], e = bands[2 * i + 1];
-        centers[i] = (s + e) / 2;
-    }
-    *outCenters = centers;
-    *outN = nBands;
 }
 
 static void build_profile_rows(SDL_Surface* s, int* H) {
@@ -75,14 +33,40 @@ static void build_profile_cols(SDL_Surface* s, int* V) {
     }
 }
 
+static int* find_line_positions(const int* prof, int N, int thr, int* out_count) {
+    int* bands = (int*)malloc(sizeof(int) * 100);
+    int count = 0;
+    int in_band = 0, band_start = 0;
+    
+    for (int i = 0; i < N; i++) {
+        if (prof[i] >= thr) {
+            if (!in_band) { 
+                band_start = i; 
+                in_band = 1; 
+            }
+        } else {
+            if (in_band) {
+                bands[count++] = (band_start + i - 1) / 2;
+                in_band = 0;
+            }
+        }
+    }
+    if (in_band) {
+        bands[count++] = (band_start + N - 1) / 2;
+    }
+    
+    *out_count = count;
+    return bands;
+}
+
 int slice_grid(SDL_Surface* grid, const char* output_dir) {
     if (!grid || !output_dir) return -1;
 
     if (SDL_MUSTLOCK(grid)) SDL_LockSurface(grid);
 
     int W = grid->w, H = grid->h;
-    int* Hprof = malloc_int(H);
-    int* Vprof = malloc_int(W);
+    int* Hprof = (int*)calloc(H, sizeof(int));
+    int* Vprof = (int*)calloc(W, sizeof(int));
 
     build_profile_rows(grid, Hprof);
     build_profile_cols(grid, Vprof);
@@ -90,38 +74,36 @@ int slice_grid(SDL_Surface* grid, const char* output_dir) {
     int thr_row = (int)(0.5 * W);
     int thr_col = (int)(0.5 * H);
 
-    int *rbands = NULL, *cbands = NULL;
     int nr = 0, nc = 0;
-    find_bands_int(Hprof, H, thr_row, &rbands, &nr);
-    find_bands_int(Vprof, W, thr_col, &cbands, &nc);
+    int* rbands = find_line_positions(Hprof, H, thr_row, &nr);
+    int* cbands = find_line_positions(Vprof, W, thr_col, &nc);
 
-    int *rcent = NULL, *ccent = NULL;
-    int nrl = 0, ncl = 0;
-    bands_to_centers(rbands, nr, &rcent, &nrl);
-    bands_to_centers(cbands, nc, &ccent, &ncl);
-
-    free(rbands); free(cbands);
     free(Hprof); free(Vprof);
 
-    if (SDL_MUSTLOCK(grid)) SDL_UnlockSurface(grid);
+    printf("[slice_grid] Detected %d row lines, %d col lines\n", nr, nc);
 
-    if (nrl < 2 || ncl < 2) {
-        fprintf(stderr, "[slice_grid] ERROR: not enough dividers rows=%d cols=%d\n", nrl, ncl);
-        free(rcent); free(ccent);
+    if (nr < 2 || nc < 2) {
+        fprintf(stderr, "[slice_grid] ERROR: not enough divider lines\n");
+        free(rbands); free(cbands);
+        if (SDL_MUSTLOCK(grid)) SDL_UnlockSurface(grid);
         return -2;
     }
 
-    int R = nrl - 1, C = ncl - 1;
+    int R = nr - 1, C = nc - 1;
     printf("[slice_grid] Detected %dx%d grid\n", R, C);
+
+    if (SDL_MUSTLOCK(grid)) SDL_UnlockSurface(grid);
 
     char path[512];
     int trim = 2;
+    int saved = 0;
+
     for (int r = 0; r < R; r++) {
         for (int c = 0; c < C; c++) {
-            int x0 = ccent[c] + trim;
-            int x1 = ccent[c + 1] - trim;
-            int y0 = rcent[r] + trim;
-            int y1 = rcent[r + 1] - trim;
+            int x0 = cbands[c] + trim;
+            int x1 = cbands[c + 1] - trim;
+            int y0 = rbands[r] + trim;
+            int y1 = rbands[r + 1] - trim;
 
             if (x1 <= x0 || y1 <= y0) continue;
 
@@ -133,10 +115,11 @@ int slice_grid(SDL_Surface* grid, const char* output_dir) {
             snprintf(path, sizeof(path), "%s/c_%02d_%02d.bmp", output_dir, r, c);
             SDL_SaveBMP(cell, path);
             SDL_FreeSurface(cell);
+            saved++;
         }
     }
 
-    free(rcent); free(ccent);
-    printf("[slice_grid] Saved %d cells to %s\n", R * C, output_dir);
+    free(rbands); free(cbands);
+    printf("[slice_grid] Saved %d cells to %s\n", saved, output_dir);
     return 0;
 }

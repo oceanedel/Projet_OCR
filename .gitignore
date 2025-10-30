@@ -53,3 +53,14 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+
+#output
+output/cells/*
+output/*.bmp
+output/words/*
+output/word_letters/*
+output/grid.txt
+
+#exec
+build/bin/*
