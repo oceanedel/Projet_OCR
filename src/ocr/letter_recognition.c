@@ -4,7 +4,10 @@
 #include <string.h>
 #include <math.h>
 #include <dirent.h>
+#include <err.h>
 
+
+/*
 #define MAX_TEMPLATES_PER_LETTER 20
 #define TEMPLATE_SIZE 32
 
@@ -192,4 +195,183 @@ void letter_recognition_cleanup() {
     }
     total_templates = 0;
     printf("[OCR] Letter recognition cleanup complete\n");
+}
+
+*/
+
+
+
+
+
+
+// OCR program
+
+#define INPUT_SIZE 784 
+#define HIDDEN_SIZE 32
+#define OUTPUT_SIZE 26
+#define LEARNING_RATE 0.1
+
+float input[INPUT_SIZE];
+float hidden[HIDDEN_SIZE];
+float output[OUTPUT_SIZE];
+
+float wIH[INPUT_SIZE][HIDDEN_SIZE]; // poids input->hidden
+float bH[HIDDEN_SIZE];              // biais hidden
+
+float wHO[HIDDEN_SIZE][OUTPUT_SIZE]; // poids hidden->output
+float bO[OUTPUT_SIZE];               // biais output
+
+
+
+//fonction sigmoid
+float sigmoid(float x)
+{
+    return 1.0/(1.0+expf(-x));
+}
+
+
+//fonction softmax
+void softmax(float *input, float *output, size_t len)
+{
+    float sum=0;
+    for(size_t i=0;i<len; i++)
+    {
+        float e=expf(input[i]);
+        sum+=e; //calcul sum
+        output[i]=e; // copie de input dans output en appliquant exp
+    }
+
+
+    for (size_t i=0;i<len;i++)
+    {
+        output[i]/=sum;  //calcul de softmax
+    }
+
+}
+
+
+
+//remplir un tableau 1D depuis un fichier texte
+void load1D(const char *filename, float *array, int size) 
+{
+    FILE *fp = fopen(filename, "r");
+    if (!fp) errx(EXIT_FAILURE, "Erreur : impossible d'ouvrir %s\n", filename);
+
+    for (int i=0;i<size;i++) 
+    {
+        if (fscanf(fp,"%f",&array[i])!=1) 
+        {
+            errx(EXIT_FAILURE,"Erreur : lecture impossible dans %s à l'index %d\n",filename,i);
+        }
+    }
+    fclose(fp);
+}
+
+//remplie une matrice 2D depuis un fichier texte
+void load2D(const char *filename, int rows, int cols, float matrix[rows][cols])
+{
+    FILE *fp = fopen(filename, "r");
+    if (!fp) errx(EXIT_FAILURE,"Erreur : impossible d'ouvrir %s\n",filename);
+
+    for (int i=0;i<rows;i++) 
+    {
+        for (int j=0;j<cols;j++) 
+        {
+            if (fscanf(fp,"%f",&matrix[i][j])!=1) 
+            {
+                errx(EXIT_FAILURE,"Erreur : lecture impossible dans %s à [%d][%d]\n",filename,i,j);
+            }
+        }
+    }
+    fclose(fp);
+}
+
+//initialise les poids et biais à partir des fichiers
+void init_weights() 
+{
+    load2D("wIH.txt",INPUT_SIZE, HIDDEN_SIZE,wIH);
+    load2D("wHO.txt",HIDDEN_SIZE, OUTPUT_SIZE,wHO);
+    load1D("bH.txt", bH, HIDDEN_SIZE);
+    load1D("bO.txt", bO, OUTPUT_SIZE);
+}
+
+
+
+
+//calcul la couche cachée 
+void calcul_hidden()
+{
+    for(int i=0;i<HIDDEN_SIZE;i++)
+    {
+        float tot=bH[i];
+        for(int j=0;j<INPUT_SIZE;j++)
+        {
+            tot+=wIH[j][i]*input[j];
+        }
+        hidden[i]=sigmoid(tot);
+    }
+}
+
+
+//calcul la couche de sortie
+void calcul_output()
+{
+    float temp[OUTPUT_SIZE];
+    for(int i=0;i<OUTPUT_SIZE;i++)
+    {
+        float tot=bO[i];
+        for(int j=0;j<HIDDEN_SIZE;j++)
+        {
+            tot+=wHO[j][i]*hidden[j];
+        }
+        temp[i]=tot;
+    }
+    softmax(temp,output,OUTPUT_SIZE);
+
+}
+
+
+//lance le réseau de neurone et fait les calculs dans les différentes couches
+void forward()
+{
+    calcul_hidden();
+    calcul_output();
+}
+
+
+
+//renvoie le résultat de la reconnaissant de la lettre sur une image rentrée en paramètre sous la forme d'une matrice 
+char letter_recognition(float **img, size_t len)
+{
+    if (len!=28) // 28 étant le nombre de pixel par ligne et colonne de la matrice image
+    {
+        errx(EXIT_FAILURE,"la matrice donnée ne possède pas la bonne taille");
+    }
+    init_weights();
+    int n=0;
+    for(size_t i=0;i<len;i++)
+    {
+        for(size_t j=0;j<len;j++)
+        {
+            input[n]=img[i][j];  //initialise l'input      
+            n++;
+        }
+    }
+    forward();
+
+    int max=0;
+    for(int i=0;i<OUTPUT_SIZE;i++)
+    {
+        printf("proba lettre %c : %.3f\n",'A'+i,output[i]);
+        if (output[i]>output[max]) max=i;
+    }
+
+    printf("\nLetter reconnu : %c",'A'+max);
+    return (char)('A'+max);
+}
+
+
+int main()
+{
+    return 0;
 }
