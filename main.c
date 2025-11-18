@@ -28,7 +28,7 @@
 
 int run_ocr_recognition(const char* cells_dir, const char* words_dir, const char* output_file) {
     // Initialize OCR engine
-    if (letter_recognition_init("training") != 0) {
+/*    if (letter_recognition_init("training") != 0) {
         fprintf(stderr, "[OCR] ⚠️  Letter recognition init failed!\n");
         fprintf(stderr, "[OCR] Falling back to placeholder data...\n\n");
         
@@ -41,8 +41,8 @@ int run_ocr_recognition(const char* cells_dir, const char* words_dir, const char
         // ... etc
         fclose(f);
         return 0;
-    }
-    
+    }*/
+
     // Process grid
     int ret = process_grid(cells_dir, output_file);
     
@@ -52,7 +52,7 @@ int run_ocr_recognition(const char* cells_dir, const char* words_dir, const char
     }
     
     // Cleanup OCR engine
-    letter_recognition_cleanup();
+//    letter_recognition_cleanup();
     
     return ret;
 }
