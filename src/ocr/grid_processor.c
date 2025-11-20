@@ -77,16 +77,8 @@ int process_grid(const char* cells_dir, const char* output_file) {
             char path[512];
             snprintf(path, sizeof(path), "%s/c_%02d_%02d.bmp", cells_dir, row, col);
             
-            SDL_Surface* cell = SDL_LoadBMP(path);
-            if (!cell) {
-                grid[row][col] = '?';
-                uncertain++;
-                continue;
-            }
-            
-            char letter = recognize_letter(cell);
+            char letter = recognize_letter(path);
             grid[row][col] = letter;
-            SDL_FreeSurface(cell);
             
             if (letter != '?') {
                 recognized++;
@@ -110,13 +102,67 @@ int process_grid(const char* cells_dir, const char* output_file) {
         free(grid);
         return -1;
     }
-    
+
     for (int i = 0; i < grid_rows; i++) {
         fprintf(f, "%s\n", grid[i]);
     }
     
     fclose(f);
-    
+
+    //Conversion du tableau en SDL_surface
+    if (output_file) {
+        if (SDL_Init(0) != 0) {
+            fprintf(stderr, "[GRID] ✗ SDL_Init failed: %s\n", SDL_GetError());
+            /* cleanup */
+            for (int i = 0; i < grid_rows; i++) free(grid[i]);
+            free(grid);
+            return -1;
+        }
+        
+        SDL_Surface *surf = SDL_CreateRGBSurface(0, grid_cols, grid_rows, 32,
+                                                 0x00FF0000,
+                                                 0x0000FF00,
+                                                 0x000000FF,
+                                                 0xFF000000);
+        if (!surf) {
+            fprintf(stderr, "[GRID] ✗ SDL_CreateRGBSurface failed: %s\n", SDL_GetError());
+            SDL_Quit();
+            for (int i = 0; i < grid_rows; i++) free(grid[i]);
+            free(grid);
+            return -1;
+        }
+        
+        /* écriture en tenant compte du pitch (padding) */
+        Uint32 *pixels = (Uint32*)surf->pixels;
+        int pitch_pixels = surf->pitch / 4; /* nombre d'Uint32 par ligne */
+        for (int y = 0; y < grid_rows; y++) {
+            for (int x = 0; x < grid_cols; x++) {
+                char ch = grid[y][x];
+                Uint8 v;
+                if (ch == '?') {
+                    v = 32; /* sombre pour incertain */
+                } else {
+                    /* exemple : lettre reconnue -> valeur lumineuse */
+                    v = 220;
+                }
+                Uint32 color = SDL_MapRGBA(surf->format, v, v, v, 255);
+                pixels[y * pitch_pixels + x] = color;
+            }
+        }
+        
+        if (SDL_SaveBMP(surf, output_file) != 0) {
+            fprintf(stderr, "[GRID] ✗ SDL_SaveBMP failed: %s\n", SDL_GetError());
+            SDL_FreeSurface(surf);
+            SDL_Quit();
+            for (int i = 0; i < grid_rows; i++) free(grid[i]);
+            free(grid);
+            return -1;
+        }
+        
+        SDL_FreeSurface(surf);
+        SDL_Quit();
+    }
+
     // Cleanup
     for (int i = 0; i < grid_rows; i++) free(grid[i]);
     free(grid);

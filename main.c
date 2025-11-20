@@ -27,21 +27,6 @@
 
 
 int run_ocr_recognition(const char* cells_dir, const char* words_dir, const char* output_file) {
-    // Initialize OCR engine
-/*    if (letter_recognition_init("training") != 0) {
-        fprintf(stderr, "[OCR] ⚠️  Letter recognition init failed!\n");
-        fprintf(stderr, "[OCR] Falling back to placeholder data...\n\n");
-        
-        // Create dummy grid
-        FILE* f = fopen(output_file, "w");
-        if (!f) return -1;
-        fprintf(f, "FLAMINGOTCSW\n");
-        fprintf(f, "KIWIPELICANA\n");
-        fprintf(f, "TURKEYEAGLEN\n");
-        // ... etc
-        fclose(f);
-        return 0;
-    }*/
 
     // Process grid
     int ret = process_grid(cells_dir, output_file);

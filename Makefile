@@ -2,8 +2,8 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c11 -g -D_POSIX_C_SOURCE=200809L `sdl2-config --cflags`
 GTK_FLAGS = `pkg-config --cflags gtk+-3.0`
-LDFLAGS = `sdl2-config --libs` -lm
-GTK_LDFLAGS = `pkg-config --libs gtk+-3.0` -lm
+LDFLAGS = `sdl2-config --libs` -lm -lSDL2 -lSDL2_image
+GTK_LDFLAGS = `pkg-config --libs gtk+-3.0` -lm 
 
 # Directories
 BUILD_DIR = build
@@ -80,6 +80,8 @@ clean:
 	rm -f output/*.bmp output/grid.txt
 	rm -rf output/cells/*.bmp
 	rm -rf output/words/*.bmp
+	rm -rf output/word_letters/*.bmp
+	rm -rf output/*.txt
 	@echo "✓ Clean complete"
 
 # Run with test image

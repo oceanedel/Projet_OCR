@@ -162,7 +162,7 @@ int slice_word_letters(const char* words_dir, const char* output_dir) {
             int width = segments[l].x_end - segments[l].x_start;
             
             // Add small margin
-            int margin = 2;
+            int margin = 0;
             x = (x > margin) ? x - margin : 0;
             width += 2 * margin;
             if (x + width > word_img->w) {

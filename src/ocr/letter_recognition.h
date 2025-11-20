@@ -74,7 +74,7 @@ void update_IH(float *errorH);
 void back_propagation(int index_letter);
 
 void training(int index_letter, float **img);
-
+char recognize_letter(char *path_letter);
 void load_letter_template(const char *dossier);
 
 SDL_Surface *normalize_size(SDL_Surface *img, int target_w, int target_h);

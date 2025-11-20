@@ -65,10 +65,10 @@ void load2D(const char *filename, int rows, int cols, float matrix[rows][cols])
 
 void loads()
 {
-    load2D("wIH.txt",INPUT_SIZE, HIDDEN_SIZE,wIH);
-    load2D("wHO.txt",HIDDEN_SIZE, OUTPUT_SIZE,wHO);
-    load1D("bH.txt", bH, HIDDEN_SIZE);
-    load1D("bO.txt", bO, OUTPUT_SIZE);
+    load2D("./output/wIH.txt",INPUT_SIZE, HIDDEN_SIZE,wIH);
+    load2D("./output/wHO.txt",HIDDEN_SIZE, OUTPUT_SIZE,wHO);
+    load1D("./output/bH.txt", bH, HIDDEN_SIZE);
+    load1D("./output/bO.txt", bO, OUTPUT_SIZE);
 }
 
 //fonction sigmoid
@@ -264,7 +264,7 @@ void training(int index_letter, float **img)
 int store_res()
 {
     // écrit les poids input-hidden
-    FILE *fp1 = fopen("wIH.txt", "w");
+    FILE *fp1 = fopen("./output/wIH.txt", "w");
     if (!fp1)
     {
         printf("Erreur : impossible d'ouvrir le fichier wIH.txt\n");
@@ -282,7 +282,7 @@ int store_res()
     fclose(fp1);
 
     // écrit les poids hidden-output
-    FILE *fp2 = fopen("wHO.txt", "w");
+    FILE *fp2 = fopen("./output/wHO.txt", "w");
     if (!fp2)
     {
         printf("Erreur : impossible d'ouvrir le fichier wHO.txt\n");
@@ -300,7 +300,7 @@ int store_res()
     fclose(fp2);
 
     // écrit les biais input-hidden
-    FILE *fp3 = fopen("bH.txt", "w");
+    FILE *fp3 = fopen("./output/bH.txt", "w");
     if (!fp3)
     {
         printf("Erreur : impossible d'ouvrir le fichier bH.txt\n");
@@ -314,7 +314,7 @@ int store_res()
     fclose(fp3);
 
     // écrit les biais hidden-output
-    FILE *fp4 = fopen("bO.txt", "w");
+    FILE *fp4 = fopen("./output/bO.txt", "w");
     if (!fp4)
     {
         printf("Erreur : impossible d'ouvrir le fichier bO.txt\n");
@@ -499,7 +499,8 @@ float **surface_to_grayscale(SDL_Surface *img)
 int train()
 {
     init_weights();
-    load_letter_template("./../../dataset");
+   // load_letter_template("../../dataset");
+    load_letter_template("./dataset");
 
     // Construire la liste des paires (lettre, variante)
     int available = 0;
@@ -593,14 +594,16 @@ char letter_recognition(float **img)
     int max=0;
     for(int i=0;i<OUTPUT_SIZE;i++)
     {
-        printf("proba lettre %c : %.3f\n",'A'+i,output[i]);
+       // printf("proba lettre %c : %.3f\n",'A'+i,output[i]);
         if (output[i]>output[max]) max=i;
     }
 
-    printf("\nLetter reconnu : %c",'A'+max);
+    printf("\nLetter reconnu : %c  avec une proba de %.3f\n",'A'+max,output[max]);
     return (char)('A'+max);
 }
 
+
+/*
 int main(int argc, char **argv)
 {
     if (argc!=2) errx(EXIT_FAILURE,"mauvais arguments. usage: %s image.png", argv[0]);
@@ -628,6 +631,7 @@ int main(int argc, char **argv)
         fclose(file);
     }
     else train();
+
 
     // Vérifie après training que les fichiers existent
     FILE *file1 = fopen( "bH.txt", "r");
@@ -678,4 +682,83 @@ int main(int argc, char **argv)
     IMG_Quit();
     SDL_Quit();
     return 0;
+}
+*/
+
+char recognize_letter(char *path_letter)
+{
+    // initialisation SDL
+    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+        errx(EXIT_FAILURE, "SDL_Init Failed: %s\n", SDL_GetError());
+    }
+
+    // initialisation SDL_image (PNG/JPG)
+    int img_flags = IMG_INIT_PNG | IMG_INIT_JPG;
+    if ((IMG_Init(img_flags) & img_flags) != img_flags) {
+        fprintf(stderr, "IMG_Init Failed: %s\n", IMG_GetError());
+        SDL_Quit();
+        errx(EXIT_FAILURE, "Impossible d'initialiser SDL_image");
+    }
+
+    // initialisation aleatoire
+    srand((unsigned int)time(NULL));
+
+    // lance le training si tous les fichiers bH, bO ... n'existent pas
+    FILE *file = fopen( "output/bH.txt", "r");
+    
+    if (file)
+    {
+        fclose(file);
+    }
+    else train();
+
+    // Vérifie après training que les fichiers existent
+    FILE *file1 = fopen( "output/bH.txt", "r");
+    if (file1)
+    {
+        fclose(file1);
+    }
+    else {
+        IMG_Quit();
+        SDL_Quit();
+        errx(EXIT_FAILURE,"erreur lors du training");
+    }
+
+    char *path=path_letter;
+
+    SDL_Surface *img = IMG_Load(path); // utilise IMG_Load pour PNG/JPG/BMP
+    if (!img) {
+        IMG_Quit();
+        SDL_Quit();
+        errx(EXIT_FAILURE, "erreur lors du chargement de l'image: %s", IMG_GetError());
+    }
+
+    SDL_Surface *norm = normalize_size(img, TEMPLATE_SIZE, TEMPLATE_SIZE);
+    SDL_FreeSurface(img);
+    if (!norm) {
+        IMG_Quit();
+        SDL_Quit();
+        errx(EXIT_FAILURE, "normalize_size a échoué");
+    }
+
+    float **img_pixel = surface_to_grayscale(norm);
+    SDL_FreeSurface(norm);
+    if (!img_pixel) {
+        IMG_Quit();
+        SDL_Quit();
+        errx(EXIT_FAILURE, "surface_to_grayscale a échoué");
+    }
+
+    printf("image situé à l'endroit : %s",path);
+    // Reconnaissance
+    char res = letter_recognition(img_pixel);
+
+
+    // Libération complète
+    for (int y = 0; y < TEMPLATE_SIZE; y++) free(img_pixel[y]);
+    free(img_pixel);
+
+    IMG_Quit();
+    SDL_Quit();
+    return res;
 }

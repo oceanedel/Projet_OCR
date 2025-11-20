@@ -1,7 +1,10 @@
+
+
 #include "slice_grid.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 static inline bool is_black(uint32_t px) {
     return ((px & 0x00FFFFFF) == 0);

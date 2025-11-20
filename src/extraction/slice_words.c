@@ -292,7 +292,7 @@ int slice_words(SDL_Surface* wordlist, const char* output_dir) {
         
         // Save each word
         for (int w = 0; w < word_count; w++) {
-            int margin = 2;
+            int margin = 0;
             int x = (words[w].x > margin) ? words[w].x - margin : 0;
             int y = (words[w].y > margin) ? words[w].y - margin : 0;
             int width = words[w].w + 2 * margin;
