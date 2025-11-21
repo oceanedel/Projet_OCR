@@ -26,14 +26,15 @@
 
 
 
-int run_ocr_recognition(const char* cells_dir, const char* words_dir, const char* output_file) {
+int run_ocr_recognition(const char* cells_dir, const char* words_dir,const char* words_letters_dir, const char* output_file) {
 
     // Process grid
     int ret = process_grid(cells_dir, output_file);
     
     // Process words
     if (ret == 0) {
-        process_words(words_dir, output_file);
+        process_words(words_dir,words_letters_dir,"output/words.txt");
+        
     }
     
     // Cleanup OCR engine
@@ -240,7 +241,7 @@ int main(int argc, char** argv) {
     printf("  Phase 2: OCR Recognition\n");
     printf("=========================================\n");
     
-    if (run_ocr_recognition("output/cells", "output/words", "output/grid.txt") != 0) {
+    if (run_ocr_recognition("output/cells", "output/words","output/word_letters", "output/grid.txt") != 0) {
         fprintf(stderr, "✗ OCR failed\n");
         SDL_Quit();
         return EXIT_FAILURE;
