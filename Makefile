@@ -99,9 +99,10 @@ run-gui: $(GUI_TARGET)
 	./$(GUI_TARGET)
 
 clean-output:
-	rm -f output/*.bmp output/grid.txt
+	rm -f output/*.bmp output/*.txt
 	rm -rf output/cells/*.bmp
 	rm -rf output/words/*.bmp
+	rm -rf output/word_letters/*
 
 	
 # Help

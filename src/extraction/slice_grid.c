@@ -98,7 +98,7 @@ int slice_grid(SDL_Surface* grid, const char* output_dir) {
     if (SDL_MUSTLOCK(grid)) SDL_UnlockSurface(grid);
 
     char path[512];
-    int trim = 2;
+    int trim = 3;
     int saved = 0;
 
     for (int r = 0; r < R; r++) {
