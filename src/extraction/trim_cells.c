@@ -128,7 +128,6 @@ static int count_cells(const char* cells_dir) {
 
 
 int trim_cells(const char* cells_dir) {
-    printf("\n[4/7] Trimming cell whitespace...\n");
     printf("[TRIM_CELLS] Processing cells in: %s\n", cells_dir);
     
     int total_cells = count_cells(cells_dir);

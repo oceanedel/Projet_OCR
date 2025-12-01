@@ -14,6 +14,7 @@
 #include "src/extraction/slice_words.h"
 #include "src/extraction/slice_letter_word.h"
 #include "src/extraction/trim_cells.h"
+#include "src/extraction/trim_word_letters.h"
 
 
 // Solver wrapper
@@ -160,7 +161,7 @@ int main(int argc, char** argv) {
     printf("════════════════════════════════════════\n");
 
     // Step 1: Binarize
-    printf("\n[1/7] Binarizing image...\n");
+    printf("\n[1/8] Binarizing image...\n");
     SDL_Surface* binary = binarize_image(image_path);
     if (!binary) {
         fprintf(stderr, "✗ Binarization failed\n");
@@ -173,7 +174,7 @@ int main(int argc, char** argv) {
     printf("  ✓ Binary image: output/binary.bmp\n");
 
     // Step 2: Extract grid
-    printf("\n[2/7] Extracting puzzle grid...\n");
+    printf("\n[2/8] Extracting puzzle grid...\n");
     int grid_x, grid_y, grid_w, grid_h;
     SDL_Surface* grid = extract_grid(binary, &grid_x, &grid_y, &grid_w, &grid_h);
 
@@ -189,7 +190,7 @@ int main(int argc, char** argv) {
     printf("  ✓ Saved: output/grid.bmp\n");
 
     // Step 3: Slice grid into cells
-    printf("\n[3/7] Slicing grid into cells...\n");
+    printf("\n[3/8] Slicing grid into cells...\n");
     mkdir("output/cells", 0755);
 
     if (slice_grid(grid, "output/cells") != 0) {
@@ -205,6 +206,7 @@ int main(int argc, char** argv) {
 
 
     // Step 4: Trim cells
+    printf("\n[4/8] Trimming cell whitespace...\n");
     if (trim_cells("output/cells") != 0) {
         fprintf(stderr, "✗ Cell trimming failed\n");
         SDL_FreeSurface(binary);
@@ -214,7 +216,7 @@ int main(int argc, char** argv) {
     printf("  ✓ Trimmed cells: output/cells/\n");
 
     // Step 5: Extract word list
-    printf("\n[5/7] Extracting word list...\n");
+    printf("\n[5/8] Extracting word list...\n");
     int wl_x, wl_y, wl_w, wl_h;
     SDL_Surface* wordlist = extract_wordlist(binary, grid_x, grid_y, grid_w, grid_h,
                                             &wl_x, &wl_y, &wl_w, &wl_h);
@@ -232,7 +234,7 @@ int main(int argc, char** argv) {
 
 
     // Step 6: Slice word list
-    printf("\n[6/7] Slicing word list...\n");
+    printf("\n[6/8] Slicing word list...\n");
     mkdir("output/words", 0755);
 
     if (slice_words(wordlist, "output/words") != 0) {
@@ -246,7 +248,7 @@ int main(int argc, char** argv) {
     printf("  ✓ Word images: output/words/\n");
 
     // Step 7: Slice word letters
-    printf("\n[7/7] Slicing word letters...\n");
+    printf("\n[7/8] Slicing word letters...\n");
     mkdir("output/word_letters", 0755);
 
     if (slice_word_letters("output/words", "output/word_letters") != 0) {
@@ -257,15 +259,15 @@ int main(int argc, char** argv) {
 
     printf("  ✓ Letter images: output/word_letters/\n");
 
-    /* Step 7: Trim word letters 
-    printf("\n[7/7] Trimming word letter whitespace...\n");
-    if (trim_cells("output/word_letters") != 0) {
+    // Step 8: Trim word letters
+    printf("\n[8/8] Trimming word letter whitespace...\n");
+    if (trim_word_letters("output/word_letters") != 0) {
         fprintf(stderr, "✗ Word letter trimming failed\n");
         SDL_Quit();
         return EXIT_FAILURE;
     }
     printf("  ✓ Trimmed letters: output/word_letters/\n");
-*/
+
 
 
     printf("\n✓ Extraction phase complete!\n");
