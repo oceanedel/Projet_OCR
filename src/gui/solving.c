@@ -33,12 +33,12 @@
 void clean_output() {
     printf("[CLEANUP] Removing old output files...\n");
     
-    (void)system("rm -f ../../*.bmp output/words.txt 2>/dev/null");
-    (void)system("rm -f ../../*.bmp output/grid.txt 2>/dev/null");
+    system("rm -f  ../../output/binary.bmp ../../output/grid.bmp ../../output/solvingwords.bmp  2>/dev/null");
+    system("rm -f ../../output/grid.txt ../../output/words.txt  2>/dev/null");
     
-    (void)system("rm -f ../../cells/*.bmp 2>/dev/null");
-    (void)system("rm -f ../../words/*.bmp 2>/dev/null");
-    (void)system("rm -f ../../word_letters/*.bmp 2>/dev/null");
+    system("rm -f ../../output/cells/*.bmp 2>/dev/null");
+    system("rm -f ../../output/words/*.bmp 2>/dev/null");
+    system("rm -f ../../output/word_letters/*.bmp 2>/dev/null");
     
     printf("[CLEANUP] ✓ Output directory cleaned\n");
 }
@@ -54,9 +54,7 @@ int run_ocr_recognition(const char* cells_dir, const char* words_dir,const char*
         process_words(words_dir,words_letters_dir,"../../output/words.txt");
         
     }
-    
-    // Cleanup OCR engine
-//    letter_recognition_cleanup();
+
     
     return ret;
 }

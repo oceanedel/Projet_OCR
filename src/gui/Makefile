@@ -38,4 +38,11 @@ $(TARGET): $(OBJ)
 
 clean:
 	rm -f $(OBJ) $(TARGET)
+	rm -f ../../output/*.bmp ../../output/grid.txt
+	rm -rf ../../output/cells/*.bmp
+	rm -rf ../../output/words/*.bmp
+	rm -rf ../../output/word_letters/*.bmp
+	rm -rf ../../output/*.txt
+	rm -rf ../../training
+	@echo "✓ Clean complete"
 

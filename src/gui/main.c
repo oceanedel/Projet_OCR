@@ -147,12 +147,58 @@ static void resize_pixbuf_to_fit(AppData *app, int max_width, int max_height) {
 
 
 
+/* Save rotated image to disk */
+static void save_rotated_bmp(AppData *app) {
+    if (!app->pixbuf) return;
+
+    int w = app->pixbuf_width;
+    int h = app->pixbuf_height;
+    double angle = app->angle_deg;
+
+    int rot_w, rot_h;
+    compute_rotated_size(w, h, angle, &rot_w, &rot_h);
+
+    /* Create cairo surface to draw rotated image with white background */
+    cairo_surface_t *surface = cairo_image_surface_create(CAIRO_FORMAT_RGB24, rot_w, rot_h);
+    cairo_t *cr = cairo_create(surface);
+
+    /* Fill with white */
+    cairo_set_source_rgb(cr, 1.0, 1.0, 1.0);
+    cairo_paint(cr);
+
+    /* Rotate around center */
+    cairo_translate(cr, rot_w / 2.0, rot_h / 2.0);
+    cairo_rotate(cr, angle * G_PI / 180.0);
+    cairo_translate(cr, -w / 2.0, -h / 2.0);
+
+    gdk_cairo_set_source_pixbuf(cr, app->pixbuf, 0, 0);
+    cairo_paint(cr);
+
+    cairo_destroy(cr);
+
+    GdkPixbuf *dest = gdk_pixbuf_get_from_surface(surface, 0, 0, rot_w, rot_h);
+    cairo_surface_destroy(surface);
+
+    if (dest) {
+        GError *err = NULL;
+        /* Save to ../../output/image.bmp */
+        if (!gdk_pixbuf_save(dest, "../../output/image.bmp", "bmp", &err, NULL)) {
+             g_printerr("Failed to save rotated image: %s\n", err ? err->message : "Unknown error");
+             if (err) g_error_free(err);
+        } else {
+             /* Success */
+        }
+        g_object_unref(dest);
+    }
+}
+
 /* Rotation helpers */
 static void rotate_by(AppData *app, double delta) {
     double new_angle = fmod(app->angle_deg + delta, 360.0);
     if (new_angle < 0) new_angle += 360.0;
     app->angle_deg = new_angle;
     gtk_range_set_value(GTK_RANGE(app->scale), app->angle_deg);
+    save_rotated_bmp(app);
 }
 
 static void on_button_left(GtkButton *btn, gpointer user_data) {
@@ -174,12 +220,14 @@ static void on_apply_angle(GtkButton *btn, gpointer user_data) {
     if (val < 0) val += 360.0;
     app->angle_deg = val;
     gtk_range_set_value(GTK_RANGE(app->scale), app->angle_deg);
+    save_rotated_bmp(app);
 }
 
-static void on_solve(GtkButton *btn, gpointer user_data) {
+static void on_solve(GtkButton *btn, gpointer user_data) 
+{
     (void)btn;
     (void)user_data;
-    launch_solving("../../data/test1_1.bmp" );
+    launch_solving("../../output/image.bmp" );
 }
 
 static void on_auto_rotation(GtkButton *btn, gpointer user_data)
@@ -189,11 +237,7 @@ static void on_auto_rotation(GtkButton *btn, gpointer user_data)
     const char *temp_input_path = "../../output/grid_before_autorotate.bmp";
     GError *error = NULL;
 
-    if (!gdk_pixbuf_save(app->pixbuf, temp_input_path, "png", &error, NULL)) {
-        g_printerr("Error saving temp image: %s\n", error->message);
-        g_error_free(error);
-        return;
-    }
+
     char *output_path = rotate_original_auto((char *)temp_input_path);
     if (!output_path) {
         g_printerr("Auto-rotation failed\n");
@@ -220,7 +264,6 @@ static void on_auto_rotation(GtkButton *btn, gpointer user_data)
 
     free(output_path);
 }
-
 
 /* Open file chooser and load image */
 static void on_open(GtkButton *btn, gpointer user_data) {
@@ -266,9 +309,27 @@ static void on_open(GtkButton *btn, gpointer user_data) {
         gtk_range_set_value(GTK_RANGE(app->scale), 0.0);
         resize_pixbuf_to_fit(app, 900, 600);
         gtk_widget_queue_draw(app->drawing_area);
+
+        //save as image.bmp
+        SDL_Surface *surface = SDL_LoadBMP(filename);
+
+        if (surface == NULL) {
+            printf("Erreur lors du chargement : %s\n", SDL_GetError());
+            return;
+        }
+        if (SDL_SaveBMP(surface,"../../output/image.bmp" ) != 0) {
+            printf("Erreur lors de la sauvegarde : %s\n", SDL_GetError());
+        } 
+        else {
+            printf("Image copiée avec succès vers : %s\n", "../../output/image.bmp");
+        }
+        SDL_FreeSurface(surface);
+
         g_free(filename);
     }
     gtk_widget_destroy(dialog);
+
+    
 }
 
 int main(int argc, char *argv[]) {
@@ -364,3 +425,4 @@ int main(int argc, char *argv[]) {
     if (app.pixbuf) g_object_unref(app.pixbuf);
     return 0;
 }
+

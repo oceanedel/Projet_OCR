@@ -208,9 +208,9 @@ void save_image(iImage *img, const char *image_path)
 
   SDL_UnlockSurface(surface);
 
-  if (IMG_SavePNG(surface, image_path) != 0) 
+  if (SDL_SaveBMP(surface, image_path) != 0) 
   {
-    fprintf(stderr, "Error while saving the image : %s\n", IMG_GetError());
+    fprintf(stderr, "Error while saving the image : %s\n", SDL_GetError());
     SDL_FreeSurface(surface);
     return;
   }
@@ -272,3 +272,4 @@ iImage *create_subimage(const iImage *original, unsigned int x, unsigned int y,
 
   return subimg;
 }
+
