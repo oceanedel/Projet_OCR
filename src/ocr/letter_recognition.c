@@ -14,7 +14,7 @@
 #define HIDDEN_SIZE 32
 #define OUTPUT_SIZE 26
 #define LEARNING_RATE 0.01
-#define MAX_TEMPLATES_PER_LETTER 1000
+#define MAX_TEMPLATES_PER_LETTER 1300
 #define TEMPLATE_SIZE 32
 #define EPOCHS 10  // Modifie cette valeur si tu veux plus/moins d'époques
 

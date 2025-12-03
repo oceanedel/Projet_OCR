@@ -253,7 +253,7 @@ double determine_rotation_angle(iImage *image)
     return 0.0;
   }
 
-  return -dominant_angle / 2 - 2;
+  return -dominant_angle/ 2 - 2;
 }
 
 /*
@@ -292,9 +292,9 @@ char *rotate_original_auto(char *path) {
 
   iImage *res = rotate_image(image, angle_deg);
 
-  save_image(res, "resources/cache/originalRotated.png");
+  save_image(res, "../../output/grid_rotate.bmp");
 
   free_image(image);
 
-  return strdup("resources/cache/originalRotated.png");
+  return strdup("../../output/grid_rotate.bmp");
 }

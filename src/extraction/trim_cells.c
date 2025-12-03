@@ -7,6 +7,8 @@
 #include <dirent.h>
 #include <sys/stat.h>
 
+#define MARGIN 1
+
 static inline bool is_black(uint32_t px) {
     return ((px & 0x00FFFFFF) == 0);
 }
@@ -79,10 +81,10 @@ static SDL_Surface* trim_image(SDL_Surface* img) {
     
     if (SDL_MUSTLOCK(img)) SDL_LockSurface(img);
     
-    int left = find_left_bound(img);
-    int right = find_right_bound(img);
-    int top = find_top_bound(img);
-    int bottom = find_bottom_bound(img);
+    int left = find_left_bound(img)-MARGIN;
+    int right = find_right_bound(img)+MARGIN;
+    int top = find_top_bound(img)-MARGIN;
+    int bottom = find_bottom_bound(img)+MARGIN;
     
     if (SDL_MUSTLOCK(img)) SDL_UnlockSurface(img);
     

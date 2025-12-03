@@ -33,7 +33,8 @@
 void clean_output() {
     printf("[CLEANUP] Removing old output files...\n");
     
-    system("rm -f output/*.bmp output/*.txt 2>/dev/null");
+    system("rm -f output/*.bmp output/words.txt 2>/dev/null");
+    system("rm -f output/*.bmp output/grid.txt 2>/dev/null");
     
     system("rm -f output/cells/*.bmp 2>/dev/null");
     system("rm -f output/words/*.bmp 2>/dev/null");

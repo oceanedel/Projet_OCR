@@ -6,6 +6,8 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#define MARGIN 1 
+
 static inline bool is_black(uint32_t px) {
     return ((px & 0x00FFFFFF) == 0);
 }
@@ -38,6 +40,9 @@ static SDL_Surface* trim_left(SDL_Surface* img) {
     
     if (SDL_MUSTLOCK(img)) SDL_UnlockSurface(img);
     
+    // Apply margin
+    if (left_cut > MARGIN) left_cut -= MARGIN; else left_cut = 0;
+
     if (left_cut == 0) return img;
     
     if (left_cut >= img->w) {
@@ -86,6 +91,9 @@ static SDL_Surface* trim_top(SDL_Surface* img) {
     
     if (SDL_MUSTLOCK(img)) SDL_UnlockSurface(img);
     
+    // Apply margin
+    if (top_cut > MARGIN) top_cut -= MARGIN; else top_cut = 0;
+
     if (top_cut == 0) return img;
     
     if (top_cut >= img->h) {
@@ -133,6 +141,12 @@ static SDL_Surface* trim_right(SDL_Surface* img) {
     
     if (SDL_MUSTLOCK(img)) SDL_UnlockSurface(img);
     
+    // Apply margin (only if we are trimming)
+    if (right_cut < img->w) {
+        right_cut += MARGIN;
+        if (right_cut > img->w) right_cut = img->w;
+    }
+
     if (right_cut == img->w) return img;
     
     if (right_cut <= 0) {
@@ -179,6 +193,12 @@ static SDL_Surface* trim_bottom(SDL_Surface* img) {
     
     if (SDL_MUSTLOCK(img)) SDL_UnlockSurface(img);
     
+    // Apply margin
+    if (bottom_cut < img->h) {
+        bottom_cut += MARGIN;
+        if (bottom_cut > img->h) bottom_cut = img->h;
+    }
+
     if (bottom_cut == img->h) return img;
     
     if (bottom_cut <= 0) {
