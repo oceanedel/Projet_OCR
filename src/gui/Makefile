@@ -12,6 +12,18 @@ SRC = \
     main.c \
     ../autorotation/rotation.c \
     ../autorotation/image.c \
+	../extraction/preprocess.c \
+    ../extraction/extract_grid.c \
+	../extraction/slice_grid.c \
+	../extraction/extract_wordlist.c \
+	../extraction/slice_words.c \
+	../extraction/slice_letter_word.c \
+	../extraction/trim_cells.c \
+	../extraction/trim_word_letters.c \
+	../solver/solver.c \
+	../ocr/letter_recognition.c\
+	../ocr/grid_processor.c \
+	../ocr/word_processor.c\
 
 OBJ = $(SRC:.c=.o)
 

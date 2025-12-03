@@ -65,10 +65,10 @@ void load2D(const char *filename, int rows, int cols, float matrix[rows][cols])
 
 void loads()
 {
-    load2D("./output/wIH.txt",INPUT_SIZE, HIDDEN_SIZE,wIH);
-    load2D("./output/wHO.txt",HIDDEN_SIZE, OUTPUT_SIZE,wHO);
-    load1D("./output/bH.txt", bH, HIDDEN_SIZE);
-    load1D("./output/bO.txt", bO, OUTPUT_SIZE);
+    load2D("../../output/wIH.txt",INPUT_SIZE, HIDDEN_SIZE,wIH);
+    load2D("../../output/wHO.txt",HIDDEN_SIZE, OUTPUT_SIZE,wHO);
+    load1D("../../output/bH.txt", bH, HIDDEN_SIZE);
+    load1D("../../output/bO.txt", bO, OUTPUT_SIZE);
 }
 
 //fonction sigmoid
@@ -264,7 +264,7 @@ void training(int index_letter, float **img)
 int store_res()
 {
     // écrit les poids input-hidden
-    FILE *fp1 = fopen("./output/wIH.txt", "w");
+    FILE *fp1 = fopen("../../output/wIH.txt", "w");
     if (!fp1)
     {
         printf("Erreur : impossible d'ouvrir le fichier wIH.txt\n");
@@ -282,7 +282,7 @@ int store_res()
     fclose(fp1);
 
     // écrit les poids hidden-output
-    FILE *fp2 = fopen("./output/wHO.txt", "w");
+    FILE *fp2 = fopen("../../output/wHO.txt", "w");
     if (!fp2)
     {
         printf("Erreur : impossible d'ouvrir le fichier wHO.txt\n");
@@ -300,7 +300,7 @@ int store_res()
     fclose(fp2);
 
     // écrit les biais input-hidden
-    FILE *fp3 = fopen("./output/bH.txt", "w");
+    FILE *fp3 = fopen("../../output/bH.txt", "w");
     if (!fp3)
     {
         printf("Erreur : impossible d'ouvrir le fichier bH.txt\n");
@@ -314,7 +314,7 @@ int store_res()
     fclose(fp3);
 
     // écrit les biais hidden-output
-    FILE *fp4 = fopen("./output/bO.txt", "w");
+    FILE *fp4 = fopen("../../output/bO.txt", "w");
     if (!fp4)
     {
         printf("Erreur : impossible d'ouvrir le fichier bO.txt\n");
@@ -500,7 +500,7 @@ int train()
 {
     init_weights();
    // load_letter_template("../../dataset");
-    load_letter_template("./dataset");
+    load_letter_template("../../dataset");
 
     // Construire la liste des paires (lettre, variante)
     int available = 0;
@@ -704,7 +704,7 @@ char recognize_letter(char *path_letter)
     srand((unsigned int)time(NULL));
 
     // lance le training si tous les fichiers bH, bO ... n'existent pas
-    FILE *file = fopen( "output/bH.txt", "r");
+    FILE *file = fopen( "../../output/bH.txt", "r");
     
     if (file)
     {
@@ -713,7 +713,7 @@ char recognize_letter(char *path_letter)
     else train();
 
     // Vérifie après training que les fichiers existent
-    FILE *file1 = fopen( "output/bH.txt", "r");
+    FILE *file1 = fopen( "../../output/bH.txt", "r");
     if (file1)
     {
         fclose(file1);

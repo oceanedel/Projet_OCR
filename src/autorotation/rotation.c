@@ -248,12 +248,19 @@ double determine_rotation_angle(iImage *image)
     dominant_angle -= 180.0;
   }
 
+  while (dominant_angle > 45.0) {
+      dominant_angle -= 90.0;
+  }
+  while (dominant_angle <= -45.0) {
+      dominant_angle += 90.0;
+  }
+
   if (fabs(dominant_angle) < ROTATION_THRESHOLD) 
   {
     return 0.0;
   }
 
-  return -dominant_angle/ 2 - 2;
+  return dominant_angle;
 }
 
 /*
@@ -277,6 +284,7 @@ char *rotate_image_auto(char *path)
   save_image(res, "resources/cache/pretraited.png");
 
   free_image(image);
+  free_image(res);
 
   return strdup("resources/cache/pretraited.png");
 }
@@ -295,6 +303,8 @@ char *rotate_original_auto(char *path) {
   save_image(res, "../../output/grid_rotate.bmp");
 
   free_image(image);
+  free_image(res);
 
   return strdup("../../output/grid_rotate.bmp");
 }
+
