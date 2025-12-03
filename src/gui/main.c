@@ -22,6 +22,8 @@
 #include "../solver/solver.h"
 #include <gdk-pixbuf/gdk-pixbuf.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include "../autorotation/rotation.h"
 
 typedef struct {
     GtkWidget *window;
@@ -159,9 +161,42 @@ static void on_solve(GtkButton *btn, gpointer user_data) {
 
 static void on_auto_rotation(GtkButton *btn, gpointer user_data)
 {
- 	//Apple du fichier autorotate a completer aussi 
-}
+    AppData *app = (AppData*)user_data;
+    if (!app->pixbuf) return;
+    const char *temp_input_path = "resources/cache/gui_temp_input.png";
+    GError *error = NULL;
 
+    if (!gdk_pixbuf_save(app->pixbuf, temp_input_path, "png", &error, NULL)) {
+        g_printerr("Error saving temp image: %s\n", error->message);
+        g_error_free(error);
+        return;
+    }
+    char *output_path = rotate_original_auto((char *)temp_input_path);
+    if (!output_path) {
+        g_printerr("Auto-rotation failed\n");
+        return;
+    }
+    GError *error2 = NULL;
+    GdkPixbuf *rot = gdk_pixbuf_new_from_file(output_path, &error2);
+    if (!rot) {
+        g_printerr("Error loading rotated image: %s\n", error2->message);
+        g_error_free(error2);
+        free(output_path);
+        return;
+    }
+    if (app->pixbuf)
+        g_object_unref(app->pixbuf);
+
+    app->pixbuf = rot;
+    app->pixbuf_width = gdk_pixbuf_get_width(rot);
+    app->pixbuf_height = gdk_pixbuf_get_height(rot);
+    app->angle_deg = 0.0;
+    gtk_range_set_value(GTK_RANGE(app->scale), 0.0);
+    gtk_entry_set_text(GTK_ENTRY(app->angle_entry), "0");
+    gtk_widget_queue_draw(app->drawing_area);
+
+    free(output_path); 
+}
 
 
 /* Open file chooser and load image */

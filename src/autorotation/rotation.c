@@ -1,15 +1,13 @@
 #include "rotation.h"
-#include "Image/image.h"
-#include <Image/Preprocess/ColorTreatment/binary.h>
-#include <Image/Preprocess/NoiseReduction/smallGroupReduction.h>
+#include "image.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-
 /*
     Compute the 2D rotation matrix for a given angle in degrees.
 */
-void rotation_matrix(double theta_deg, double R[2][2]) {
+void rotation_matrix(double theta_deg, double R[2][2]) 
+{
   double theta = theta_deg * PI / 180.0;
   R[0][0] = cos(theta);
   R[0][1] = -sin(theta);
@@ -21,7 +19,8 @@ void rotation_matrix(double theta_deg, double R[2][2]) {
     Rotate a point (x, y) around a center using a rotation matrix.
 */
 void rotate_point(double x, double y, double center_x, double center_y,
-                  double R[2][2], double *new_x, double *new_y) {
+                  double R[2][2], double *new_x, double *new_y) 
+{
   double x_centered = x - center_x;
   double y_centered = y - center_y;
 
@@ -34,7 +33,8 @@ void rotate_point(double x, double y, double center_x, double center_y,
 */
 void compute_new_dimensions(unsigned int width, unsigned int height,
                             double angle_deg, unsigned int *new_width,
-                            unsigned int *new_height) {
+                            unsigned int *new_height) 
+{
   double angle_rad = angle_deg * PI / 180.0;
 
   double cos_theta = fabs(cos(angle_rad));
@@ -47,7 +47,8 @@ void compute_new_dimensions(unsigned int width, unsigned int height,
 /*
   Its name talks for itself
 */
-iImage *rotate_image(iImage *image, double angle_deg) {
+iImage *rotate_image(iImage *image, double angle_deg) 
+{
 
   unsigned int width = image->width;
   unsigned int height = image->height;
@@ -67,17 +68,21 @@ iImage *rotate_image(iImage *image, double angle_deg) {
   rotated_image->width = new_width;
   rotated_image->height = new_height;
   rotated_image->pixels = (pPixel **)malloc(new_height * sizeof(pPixel *));
-  for (unsigned int i = 0; i < new_height; i++) {
+  for (unsigned int i = 0; i < new_height; i++) 
+  {
     rotated_image->pixels[i] = (pPixel *)malloc(new_width * sizeof(pPixel));
-    for (unsigned int j = 0; j < new_width; j++) {
+    for (unsigned int j = 0; j < new_width; j++) 
+    {
       rotated_image->pixels[i][j].r = 255;
       rotated_image->pixels[i][j].g = 255;
       rotated_image->pixels[i][j].b = 255;
     }
   }
 
-  for (unsigned int y = 0; y < new_height; y++) {
-    for (unsigned int x = 0; x < new_width; x++) {
+  for (unsigned int y = 0; y < new_height; y++) 
+  {
+    for (unsigned int x = 0; x < new_width; x++) 
+    {
       double src_x, src_y;
 
       rotate_point(x, y, new_center_x, new_center_y, R, &src_x, &src_y);
@@ -85,7 +90,8 @@ iImage *rotate_image(iImage *image, double angle_deg) {
       src_x -= (new_center_x - center_x);
       src_y -= (new_center_y - center_y);
 
-      if (src_x >= 0 && src_x < width - 1 && src_y >= 0 && src_y < height - 1) {
+      if (src_x >= 0 && src_x < width - 1 && src_y >= 0 && src_y < height - 1) 
+      {
         int x0 = (int)floor(src_x);
         int y0 = (int)floor(src_y);
         int x1 = x0 + 1;
@@ -120,12 +126,15 @@ iImage *rotate_image(iImage *image, double angle_deg) {
 /*
   Its name talks for itself
 */
-void detect_edges(iImage *image, double **edges, double **angles) {
+void detect_edges(iImage *image, double **edges, double **angles) 
+{
   unsigned int width = image->width;
   unsigned int height = image->height;
 
-  for (unsigned int y = 1; y < height - 1; y++) {
-    for (unsigned int x = 1; x < width - 1; x++) {
+  for (unsigned int y = 1; y < height - 1; y++) 
+  {
+    for (unsigned int x = 1; x < width - 1; x++) 
+    {
       double gx =
           image->pixels[y - 1][x + 1].r - image->pixels[y - 1][x - 1].r +
           2 * image->pixels[y][x + 1].r - 2 * image->pixels[y][x - 1].r +
@@ -138,7 +147,8 @@ void detect_edges(iImage *image, double **edges, double **angles) {
 
       double magnitude = sqrt(gx * gx + gy * gy);
 
-      if (magnitude > 50.0) {
+      if (magnitude > 50.0) 
+      {
         edges[y][x] = magnitude;
 
         double gradient_angle = atan2(gy, gx) * 180.0 / PI;
@@ -162,24 +172,30 @@ void detect_edges(iImage *image, double **edges, double **angles) {
 /*
   Its name talks for itself
 */
-double find_dominant_angle(double **edges, double **angles, unsigned int width,
-                           unsigned int height) {
+double find_dominant_angle(double **edges, double **angles, unsigned int width, unsigned int height) 
+{
   int angle_bins[180] = {0};
 
-  for (unsigned int y = 1; y < height - 1; y++) {
-    for (unsigned int x = 1; x < width - 1; x++) {
-      if (edges[y][x] > 0) {
+  for (unsigned int y = 1; y < height - 1; y++) 
+  {
+    for (unsigned int x = 1; x < width - 1; x++) 
+    {
+      if (edges[y][x] > 0) 
+      {
         double angle = angles[y][x];
 
-        while (angle < 0.0) {
+        while (angle < 0.0) 
+	{
           angle += 180.0;
         }
-        while (angle >= 180.0) {
+        while (angle >= 180.0) 
+	{
           angle -= 180.0;
         }
 
         int bin = (int)(angle + 0.5);
-        if (bin >= 0 && bin < 180) {
+        if (bin >= 0 && bin < 180)
+	{
           angle_bins[bin]++;
         }
       }
@@ -188,8 +204,10 @@ double find_dominant_angle(double **edges, double **angles, unsigned int width,
 
   int max_votes = 0;
   int dominant_angle = 0;
-  for (int i = 0; i < 180; i++) {
-    if (angle_bins[i] > max_votes) {
+  for (int i = 0; i < 180; i++) 
+  {
+    if (angle_bins[i] > max_votes) 
+    {
       max_votes = angle_bins[i];
       dominant_angle = i;
     }
@@ -201,7 +219,8 @@ double find_dominant_angle(double **edges, double **angles, unsigned int width,
 /*
   Its name talks for itself
 */
-double determine_rotation_angle(iImage *image) {
+double determine_rotation_angle(iImage *image) 
+{
   unsigned int width = image->width;
   unsigned int height = image->height;
 
@@ -216,18 +235,21 @@ double determine_rotation_angle(iImage *image) {
 
   double dominant_angle = find_dominant_angle(edges, angles, width, height);
 
-  for (unsigned int i = 0; i < height; i++) {
+  for (unsigned int i = 0; i < height; i++) 
+  {
     free(edges[i]);
     free(angles[i]);
   }
   free(edges);
   free(angles);
 
-  if (dominant_angle > 90.0) {
+  if (dominant_angle > 90.0) 
+  {
     dominant_angle -= 180.0;
   }
 
-  if (fabs(dominant_angle) < ROTATION_THRESHOLD) {
+  if (fabs(dominant_angle) < ROTATION_THRESHOLD) 
+  {
     return 0.0;
   }
 
@@ -237,7 +259,8 @@ double determine_rotation_angle(iImage *image) {
 /*
   Its name talks for itself
 */
-char *rotate_image_auto(char *path) {
+char *rotate_image_auto(char *path) 
+{
   iImage *image = load_image(path, -1);
 
   if (!image) {
@@ -248,8 +271,8 @@ char *rotate_image_auto(char *path) {
 
   iImage *res = rotate_image(image, angle_deg);
 
-  binary(res);
-  apply_groups_reduction(res);
+ // binary(res);
+  //apply_groups_reduction(res);
 
   save_image(res, "resources/cache/pretraited.png");
 
