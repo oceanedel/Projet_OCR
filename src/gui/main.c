@@ -20,6 +20,8 @@
 #include <gtk/gtk.h>
 #include <math.h>
 #include "../solver/solver.h"
+#include <gdk-pixbuf/gdk-pixbuf.h>
+#include <stdlib.h>
 
 typedef struct {
     GtkWidget *window;
@@ -42,6 +44,8 @@ static void compute_rotated_size(int w, int h, double angle_deg, int *out_w, int
     *out_w = (int)ceil(new_w);
     *out_h = (int)ceil(new_h);
 }
+
+
 
 /* Draw function – image always fits inside fixed drawing area */
 static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer user_data) {
@@ -115,6 +119,111 @@ static void resize_pixbuf_to_fit(AppData *app, int max_width, int max_height) {
     app->pixbuf_height = new_h;
 }
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+
+#include <math.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <gdk-pixbuf/gdk-pixbuf.h>
+#include <gtk/gtk.h>
+
+double detect_angle(AppData *app, int width, int height)
+{
+    const int angles = 180;
+    int* histogram = calloc(angles, sizeof(int));
+    if (!histogram) return 0.0;
+
+    guchar* pixels = gdk_pixbuf_get_pixels(app->pixbuf);
+    int rowstride = gdk_pixbuf_get_rowstride(app->pixbuf);
+    int n_channels = gdk_pixbuf_get_n_channels(app->pixbuf);
+
+    int step = (width * height > 1000000) ? 2 : 1;
+
+    for (int y = 1; y < height - 1; y += step)
+    {
+        for (int x = 1; x < width - 1; x += step)
+        {
+            guchar* p = pixels + y * rowstride + x * n_channels;
+            int gray = (p[0] + p[1] + p[2]) / 3;
+            if (gray < 128)
+            {
+                guchar* pxm1 = pixels + y * rowstride + (x - 1) * n_channels;
+                guchar* pxp1 = pixels + y * rowstride + (x + 1) * n_channels;
+                guchar* pym1 = pixels + (y - 1) * rowstride + x * n_channels;
+                guchar* pyp1 = pixels + (y + 1) * rowstride + x * n_channels;
+
+                int gx = ((pxp1[0] + pxp1[1] + pxp1[2]) / 3) - ((pxm1[0] + pxm1[1] + pxm1[2]) / 3);
+                int gy = ((pyp1[0] + pyp1[1] + pyp1[2]) / 3) - ((pym1[0] + pym1[1] + pym1[2]) / 3);
+
+                if (abs(gx) + abs(gy) < 50) continue;
+
+                double angle = atan2((double)gy, (double)gx);
+                double deg = angle * 180.0 / M_PI;
+                if (deg < 0) deg += 180.0;
+
+                int bin = (int)(deg + 0.5);
+                if (bin >= 0 && bin < angles)
+                    histogram[bin]++;
+            }
+        }
+    }
+
+    int best_bin = 0;
+    for (int i = 1; i < angles; i++)
+    {
+        if (histogram[i] > histogram[best_bin])
+            best_bin = i;
+    }
+
+    free(histogram);
+
+    double raw_angle = (double)best_bin;
+    double text_angle = raw_angle - 90.0;
+
+    if (text_angle > 45.0) text_angle -= 90.0;
+    if (text_angle < -45.0) text_angle += 90.0;
+
+    app->angle_deg = text_angle;
+    printf("[DEBUG] Angle détecté : %.2f°\n", text_angle);
+    return text_angle;
+}
+
+unsigned char* get_binary_image(GdkPixbuf *pixbuf)
+{
+    if (!pixbuf) return NULL;
+
+    int width = gdk_pixbuf_get_width(pixbuf);
+    int height = gdk_pixbuf_get_height(pixbuf);
+    int rowstride = gdk_pixbuf_get_rowstride(pixbuf);
+    int n_channels = gdk_pixbuf_get_n_channels(pixbuf);
+    guchar *pixels = gdk_pixbuf_get_pixels(pixbuf);
+
+    unsigned char *bin = (unsigned char*)calloc(width * height, sizeof(unsigned char));
+    if (!bin) return NULL;
+
+    for (int y = 0; y < height; y++)
+    {
+        guchar *row = pixels + y * rowstride;
+        for (int x = 0; x < width; x++)
+        {
+            guchar r = row[x * n_channels + 0];
+            guchar g = row[x * n_channels + 1];
+            guchar b = row[x * n_channels + 2];
+
+            // Conversion en niveau de gris
+            double gray = 0.299*r + 0.587*g + 0.114*b;
+
+            // Seuillage simple pour noir/blanc
+            bin[y * width + x] = (gray < 128) ? 0 : 255;
+        }
+    }
+
+    return bin;
+}
+
+
 /* Rotation helpers */
 static void rotate_by(AppData *app, double delta) {
     double new_angle = fmod(app->angle_deg + delta, 360.0);
@@ -150,11 +259,24 @@ static void on_solve(GtkButton *btn, gpointer user_data) {
     // Appel du solver à compléter
 }
 
-static void on_auto_rotation(GtkButton *btn, gpointer user_data) {
-    (void)btn;
-    (void)user_data;
-    // À implémenter plus tard
+static void on_auto_rotation(GtkButton *btn, gpointer user_data)
+{
+    AppData *app = (AppData*)user_data;
+    if (!app->pixbuf) return;
+
+    
+    // Détecter l'angle du texte
+    double angle = detect_angle(app, app->pixbuf_width, app->pixbuf_height);
+   
+
+    // Appliquer l'angle automatiquement
+    rotate_by(app, -8.0);  // négatif pour corriger l'inclinaison
+
+    // Redessiner
+    gtk_widget_queue_draw(app->drawing_area);
 }
+
+
 
 /* Open file chooser and load image */
 static void on_open(GtkButton *btn, gpointer user_data) {
