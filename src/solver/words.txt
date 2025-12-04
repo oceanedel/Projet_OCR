@@ -1,0 +1,8 @@
+horizontal
+vertical
+diagonal
+find
+hello
+world
+goldorak
+

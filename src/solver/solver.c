@@ -9,7 +9,7 @@
 #define MAX_COLS 100
 
 char grid[MAX_ROWS][MAX_COLS];
-int rows = 0, cols = 0;
+int rows, cols;
 
 void read_grid(const char *filename) {
     FILE *file = fopen(filename, "r");
@@ -37,43 +37,42 @@ void read_grid(const char *filename) {
     fclose(file);
 }
 
-int check_word_in_direction(char word[], int x, int y, int x1, int y1) {
+int check_word_in_direction(const char *word, int sx, int sy, int dx, int dy) {
     int len = strlen(word);
     for (int i = 0; i < len; i++) {
-        int x2 = x + i * x1;
-        int y2 = y + i * y1;
-
-        if (x2 < 0 || x2 >= rows || y2 < 0 || y2 >= cols)
-            return 0;
-        if (grid[x2][y2] != word[i])
+        int x = sx + i * dx;
+        int y = sy + i * dy;
+        if (x < 0 || x >= rows || y < 0 || y >= cols || toupper(grid[x][y]) != toupper(word[i]))
             return 0;
     }
     return 1;
 }
 
-int find_word(char word[], int *x, int *y, int *x1, int *y1) {
-    int directions[8][2] = {
-        {0, 1}, {0, -1}, {1, 0}, {-1, 0},
-        {1, 1}, {1, -1}, {-1, 1}, {-1, -1}
-    };
-
-    // FIXED: Was using x/y in loop instead of x2/y2
-    for (int x2 = 0; x2 < rows; x2++) {
-        for (int y2 = 0; y2 < cols; y2++) {
-            if (grid[x2][y2] == word[0]) {
+/*int main(int argc, char *argv[]) {
+    if (argc != 3) {
+        fprintf(stderr, "Usage: %s grid.txt WORD\n", argv[0]);
+        return 1;
+    }
+    
+    read_grid(argv[1]);
+    char word[256]; strcpy(word, argv[2]);
+    
+    int dirs[8][2] = {{0,1},{0,-1},{1,0},{-1,0},{1,1},{1,-1},{-1,1},{-1,-1}};
+    
+    for (int r = 0; r < rows; r++) {
+        for (int c = 0; c < cols; c++) {
+            if (toupper(grid[r][c]) == toupper(word[0])) {
                 for (int d = 0; d < 8; d++) {
-                    if (check_word_in_direction(word, x2, y2, directions[d][0], directions[d][1])) {
-                        *x = y2;
-                        *y = x2;
-                        *x1 = y2 + (strlen(word) - 1) * directions[d][1];
-                        *y1 = x2 + (strlen(word) - 1) * directions[d][0];
-                        return 1;
+                    int dx = dirs[d][0], dy = dirs[d][1];
+                    if (check_word_in_direction(word, r, c, dx, dy)) {
+                        int len = strlen(word) - 1;
+                        printf("(%d,%d)(%d,%d)\n", c, r, c + len * dy, r + len * dx);
+                        return 0;
                     }
                 }
             }
         }
     }
+    printf("Not found\n");
     return 0;
-}
-
-
+}*/
