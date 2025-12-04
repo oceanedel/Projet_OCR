@@ -29,6 +29,7 @@
 
 #include <dirent.h>
 
+
 // Clean output directory
 void clean_output() {
     printf("[CLEANUP] Removing old output files...\n");
@@ -59,7 +60,59 @@ int run_ocr_recognition(const char* cells_dir, const char* words_dir,const char*
     return ret;
 }
 
-
+static void print_highlighted_grid(int rows, int cols) {
+    printf("\nSolved grid:\n\n");
+    
+    // Allocate mark array
+    int **mark = malloc(rows * sizeof(int*));
+    for (int y = 0; y < rows; y++) {
+        mark[y] = calloc(cols, sizeof(int));
+    }
+    
+    // Reload words and mark found ones
+    FILE* words_file = fopen("../../output/words.txt", "r");
+    if (words_file) {
+        char line[256];
+        while (fgets(line, sizeof(line), words_file)) {
+            line[strcspn(line, "\n\r")] = 0;
+            if (strlen(line) == 0) continue;
+            
+            int x0, y0, x1, y1;
+            if (find_word(line, &x0, &y0, &x1, &y1)) {
+                // Mark word path
+                int dx = (x1 > x0) ? 1 : (x1 < x0 ? -1 : 0);
+                int dy = (y1 > y0) ? 1 : (y1 < y0 ? -1 : 0);
+                int x = x0, y = y0;
+                while (1) {
+                    if (x >= 0 && x < cols && y >= 0 && y < rows)
+                        mark[y][x] = 1;
+                    if (x == x1 && y == y1) break;
+                    x += dx; y += dy;
+                }
+            }
+        }
+        fclose(words_file);
+    }
+    
+    // Print with YELLOW highlights
+    #define YELLOW_BG "\x1b[43m"
+    #define RESET     "\x1b[0m"
+    for (int y = 0; y < rows; y++) {
+        for (int x = 0; x < cols; x++) {
+            char c = grid[y][x];
+            if (mark[y][x])
+                printf("%s %c %s", YELLOW_BG, c, RESET);
+            else
+                printf("%c ", c);
+        }
+        printf("\n");
+    }
+    printf("\n");
+    
+    // Cleanup
+    for (int y = 0; y < rows; y++) free(mark[y]);
+    free(mark);
+}
 
 
 int launch_solving(char *image_path) 
@@ -297,6 +350,7 @@ int launch_solving(char *image_path)
     }
 
     printf("\n");
+    print_highlighted_grid(rows, cols);
 
     SDL_Quit();
     return EXIT_SUCCESS;

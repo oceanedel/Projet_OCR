@@ -11,6 +11,7 @@
 char grid[MAX_ROWS][MAX_COLS];
 int rows, cols;
 
+
 void read_grid(const char *filename) {
     FILE *file = fopen(filename, "r");
     if (!file) {
@@ -47,6 +48,31 @@ int check_word_in_direction(const char *word, int sx, int sy, int dx, int dy) {
     }
     return 1;
 }
+
+int find_word(char word[], int *x, int *y, int *x1, int *y1) {
+    int directions[8][2] = {
+        {0, 1}, {0, -1}, {1, 0}, {-1, 0},
+        {1, 1}, {1, -1}, {-1, 1}, {-1, -1}
+    };
+    
+    for (int r = 0; r < rows; r++) {
+        for (int c = 0; c < cols; c++) {
+            if (toupper(grid[r][c]) == toupper(word[0])) {
+                for (int d = 0; d < 8; d++) {
+                    int dx = directions[d][0], dy = directions[d][1];
+                    if (check_word_in_direction(word, r, c, dx, dy)) {
+                        *x = c; *y = r;
+                        *x1 = c + (strlen(word)-1) * dy;
+                        *y1 = r + (strlen(word)-1) * dx;
+                        return 1;
+                    }
+                }
+            }
+        }
+    }
+    return 0;
+}
+
 
 /*int main(int argc, char *argv[]) {
     if (argc != 3) {

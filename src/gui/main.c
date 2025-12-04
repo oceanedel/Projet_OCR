@@ -84,16 +84,17 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer user_data) {
     /* fond gris clair */
     cairo_set_source_rgb(cr, 0.95, 0.95, 0.95);
     cairo_paint(cr);
-
+    
     if (!app->pixbuf)
         return FALSE;
 
-    /* taille image après rotation */
+
     int rot_w, rot_h;
     compute_rotated_size(app->pixbuf_width, app->pixbuf_height, app->angle_deg, &rot_w, &rot_h);
 
     /* calcul du facteur d’échelle pour tout faire tenir */
     double scale = fmin((double)da_w / rot_w, (double)da_h / rot_h);
+
 
     /* centre de la zone de dessin */
     double cx = da_w / 2.0;
@@ -109,10 +110,13 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer user_data) {
     double py = -app->pixbuf_height / 2.0;
     gdk_cairo_set_source_pixbuf(cr, app->pixbuf, px, py);
     cairo_paint(cr);
+
     cairo_restore(cr);
 
     return FALSE;
 }
+
+
 
 /* Slider change handler */
 static void on_scale_value_changed(GtkRange *range, gpointer user_data) {
@@ -223,19 +227,22 @@ static void on_apply_angle(GtkButton *btn, gpointer user_data) {
     save_rotated_bmp(app);
 }
 
-static void on_solve(GtkButton *btn, gpointer user_data) 
-{
+static void on_solve(GtkButton *btn, gpointer user_data) {
     (void)btn;
     (void)user_data;
-    launch_solving("../../output/image.bmp" );
+    
+    // 1. Run your solving pipeline (this calls OCR, solver, etc.)
+    launch_solving("../../output/image.bmp");
+
+    
 }
+
 
 static void on_auto_rotation(GtkButton *btn, gpointer user_data)
 {
     AppData *app = (AppData*)user_data;
     if (!app->pixbuf) return;
     const char *temp_input_path = "../../output/grid_before_autorotate.bmp";
-    GError *error = NULL;
 
 
     char *output_path = rotate_original_auto((char *)temp_input_path);
