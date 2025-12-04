@@ -63,13 +63,29 @@ int run_ocr_recognition(const char* cells_dir, const char* words_dir,const char*
 static void print_highlighted_grid(int rows, int cols) {
     printf("\nSolved grid:\n\n");
     
-    // Allocate mark array
-    int **mark = malloc(rows * sizeof(int*));
-    for (int y = 0; y < rows; y++) {
-        mark[y] = calloc(cols, sizeof(int));
-    }
+    static const char *colors[] = {
+        "\x1b[48;5;220m",  // Light orange
+        "\x1b[48;5;156m",  // Light green  
+        "\x1b[48;5;222m",  // Light yellow
+        "\x1b[48;5;117m",  // Light blue
+        "\x1b[48;5;201m",  // Light magenta
+        "\x1b[48;5;123m",  // Light cyan
+        "\x1b[48;5;215m",  // Light pink
+        "\x1b[48;5;191m"   // Light lime
+    };
     
-    // Reload words and mark found ones
+    #define NUM_COLORS 8
+    #define RESET "\x1b[0m"
+    
+    typedef struct {
+        int x0, y0, x1, y1;
+        int color_index;
+    } FoundWord;
+    
+    FoundWord found_words[100];
+    int found_count = 0;
+    
+    // Find all words and store coordinates
     FILE* words_file = fopen("../../output/words.txt", "r");
     if (words_file) {
         char line[256];
@@ -79,39 +95,54 @@ static void print_highlighted_grid(int rows, int cols) {
             
             int x0, y0, x1, y1;
             if (find_word(line, &x0, &y0, &x1, &y1)) {
-                // Mark word path
-                int dx = (x1 > x0) ? 1 : (x1 < x0 ? -1 : 0);
-                int dy = (y1 > y0) ? 1 : (y1 < y0 ? -1 : 0);
-                int x = x0, y = y0;
-                while (1) {
-                    if (x >= 0 && x < cols && y >= 0 && y < rows)
-                        mark[y][x] = 1;
-                    if (x == x1 && y == y1) break;
-                    x += dx; y += dy;
-                }
+                found_words[found_count].x0 = x0;
+                found_words[found_count].y0 = y0;
+                found_words[found_count].x1 = x1;
+                found_words[found_count].y1 = y1;
+                found_words[found_count].color_index = found_count % NUM_COLORS;
+                found_count++;
             }
         }
         fclose(words_file);
     }
     
-    // Print with YELLOW highlights
-    #define YELLOW_BG "\x1b[43m"
-    #define RESET     "\x1b[0m"
+    // Print grid with multi-color highlights
     for (int y = 0; y < rows; y++) {
         for (int x = 0; x < cols; x++) {
             char c = grid[y][x];
-            if (mark[y][x])
-                printf("%s %c %s", YELLOW_BG, c, RESET);
-            else
+            bool highlighted = false;
+            
+            // Check if this cell belongs to any word (last word wins for overlaps)
+            for (int w = found_count - 1; w >= 0; w--) {
+                int dx = (found_words[w].x1 > found_words[w].x0) ? 1 : 
+                        ((found_words[w].x1 < found_words[w].x0) ? -1 : 0);
+                int dy = (found_words[w].y1 > found_words[w].y0) ? 1 : 
+                        ((found_words[w].y1 < found_words[w].y0) ? -1 : 0);
+                int cx = found_words[w].x0, cy = found_words[w].y0;
+                int steps = 0;
+                int max_steps = abs(found_words[w].x1 - found_words[w].x0);
+                if (abs(found_words[w].y1 - found_words[w].y0) > max_steps)
+                    max_steps = abs(found_words[w].y1 - found_words[w].y0);
+                
+                while (steps <= max_steps) {
+                    if (cx == x && cy == y) {
+                        printf("%s%c%s ", colors[found_words[w].color_index], c, RESET);
+                        highlighted = true;
+                        break;
+                    }
+                    cx += dx;
+                    cy += dy;
+                    steps++;
+                }
+                if (highlighted) break;
+            }
+            
+            if (!highlighted)
                 printf("%c ", c);
         }
         printf("\n");
     }
     printf("\n");
-    
-    // Cleanup
-    for (int y = 0; y < rows; y++) free(mark[y]);
-    free(mark);
 }
 
 
@@ -126,7 +157,6 @@ int launch_solving(char *image_path)
         fprintf(stderr, "✗ SDL Init Error: %s\n", SDL_GetError());
         return EXIT_FAILURE;
     }
-    
 
     // Phase 1: Extraction
     printf("\n");
