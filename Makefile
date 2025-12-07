@@ -82,7 +82,7 @@ clean:
 	rm -rf output/words/*.bmp
 	rm -rf output/word_letters/*.bmp
 	rm -rf output/*.txt
-	rm -rf output
+	
 	rm -rf training
 	@echo "✓ Clean complete"
 

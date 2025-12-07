@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <SDL2/SDL.h>
+#include "solving.h"
 
 // Extraction modules
 #include "../extraction/preprocess.h"
@@ -30,17 +31,18 @@
 #include <dirent.h>
 
 
+
 // Clean output directory
 void clean_output() {
     printf("[CLEANUP] Removing old output files...\n");
+    int res;
+    res=system("rm -f  ../../output/binary.bmp ../../output/grid.bmp ../../output/solvingwords.bmp  2>/dev/null");
+    res=system("rm -f ../../output/grid.txt ../../output/words.txt  2>/dev/null");
     
-    system("rm -f  ../../output/binary.bmp ../../output/grid.bmp ../../output/solvingwords.bmp  2>/dev/null");
-    system("rm -f ../../output/grid.txt ../../output/words.txt  2>/dev/null");
-    
-    system("rm -f ../../output/cells/*.bmp 2>/dev/null");
-    system("rm -f ../../output/words/*.bmp 2>/dev/null");
-    system("rm -f ../../output/word_letters/*.bmp 2>/dev/null");
-    
+    res=system("rm -f ../../output/cells/*.bmp 2>/dev/null");
+    res=system("rm -f ../../output/words/*.bmp 2>/dev/null");
+    res=system("rm -f ../../output/word_letters/*.bmp 2>/dev/null");
+    (void)res;
     printf("[CLEANUP] ✓ Output directory cleaned\n");
 }
 
@@ -146,9 +148,12 @@ static void print_highlighted_grid(int rows, int cols) {
 }
 
 
-int launch_solving(char *image_path) 
+int launch_solving(char *image_path, gpointer user_data) 
 {
-        
+    AppData *app = (AppData*)user_data;
+
+    gtk_label_set_text(GTK_LABEL(app->message_label), "Grid solving in progress...");
+    gtk_widget_set_name(app->message_label, "message_error");
     if (image_path==NULL) return EXIT_FAILURE;
         
     clean_output();
@@ -168,6 +173,8 @@ int launch_solving(char *image_path)
     printf("\n[1/8] Binarizing image...\n");
     SDL_Surface* binary = binarize_image(image_path);
     if (!binary) {
+        gtk_label_set_text(GTK_LABEL(app->message_label), "✗ Binarization failed");
+        gtk_widget_set_name(app->message_label, "message_error"); 
         fprintf(stderr, "✗ Binarization failed\n");
         SDL_Quit();
         return EXIT_FAILURE;
@@ -183,6 +190,8 @@ int launch_solving(char *image_path)
     SDL_Surface* grid = extract_grid(binary, &grid_x, &grid_y, &grid_w, &grid_h);
 
     if (!grid) {
+        gtk_label_set_text(GTK_LABEL(app->message_label), "✗ Grid extraction failed");
+        gtk_widget_set_name(app->message_label, "message_error"); 
         fprintf(stderr, "✗ Grid extraction failed\n");
         SDL_FreeSurface(binary);
         SDL_Quit();
@@ -198,6 +207,8 @@ int launch_solving(char *image_path)
     mkdir("../../output/cells", 0755);
 
     if (slice_grid(grid, "../../output/cells") != 0) {
+        gtk_label_set_text(GTK_LABEL(app->message_label), "✗ Grid slicing failed");
+        gtk_widget_set_name(app->message_label, "message_error");  
         fprintf(stderr, "✗ Grid slicing failed\n");
         SDL_FreeSurface(grid);
         SDL_FreeSurface(binary);
@@ -227,6 +238,9 @@ int launch_solving(char *image_path)
     SDL_FreeSurface(binary);
 
     if (!wordlist) {
+        gtk_label_set_text(GTK_LABEL(app->message_label), "✗ Word list extraction failed");
+        gtk_widget_set_name(app->message_label, "message_error");
+
         fprintf(stderr, "✗ Word list extraction failed\n");
         SDL_Quit();
         return EXIT_FAILURE;
@@ -242,6 +256,8 @@ int launch_solving(char *image_path)
     mkdir("../../output/words", 0755);
 
     if (slice_words(wordlist, "../../output/words") != 0) {
+        gtk_label_set_text(GTK_LABEL(app->message_label), "✗ Word slicing failed");
+        gtk_widget_set_name(app->message_label, "message_error");
         fprintf(stderr, "✗ Word slicing failed\n");
         SDL_FreeSurface(wordlist);
         SDL_Quit();
@@ -256,6 +272,8 @@ int launch_solving(char *image_path)
     mkdir("../../output/word_letters", 0755);
 
     if (slice_word_letters("../../output/words", "../../output/word_letters") != 0) {
+        gtk_label_set_text(GTK_LABEL(app->message_label), "✗ Word letter slicing failed");
+        gtk_widget_set_name(app->message_label, "message_error");
         fprintf(stderr, "✗ Word letter slicing failed\n");
         SDL_Quit();
         return EXIT_FAILURE;
@@ -266,6 +284,9 @@ int launch_solving(char *image_path)
     // Step 8: Trim word letters
     printf("\n[8/8] Trimming word letter whitespace...\n");
     if (trim_word_letters("../../output/word_letters") != 0) {
+        gtk_label_set_text(GTK_LABEL(app->message_label), "✗ Word letter trimming failed");
+        gtk_widget_set_name(app->message_label, "message_error");
+
         fprintf(stderr, "✗ Word letter trimming failed\n");
         SDL_Quit();
         return EXIT_FAILURE;
@@ -288,6 +309,8 @@ int launch_solving(char *image_path)
     printf("=========================================\n");
     
     if (run_ocr_recognition("../../output/cells", "../../output/words","../../output/word_letters", "../../output/grid.txt") != 0) {
+        gtk_label_set_text(GTK_LABEL(app->message_label), "✗ OCR failed");
+        gtk_widget_set_name(app->message_label, "message_error");
         fprintf(stderr, "✗ OCR failed\n");
         SDL_Quit();
         return EXIT_FAILURE;
@@ -338,6 +361,8 @@ int launch_solving(char *image_path)
         printf("[SOLVER] Loaded %d words from file\n\n", word_count);
         
         if (word_count == 0) {
+            gtk_label_set_text(GTK_LABEL(app->message_label), "✗ No words found in file");
+            gtk_widget_set_name(app->message_label, "message_error");
             fprintf(stderr, "[SOLVER] ✗ No words found in file\n");
             free(words);
             SDL_Quit();
@@ -365,10 +390,18 @@ int launch_solving(char *image_path)
         printf("Result: %d/%d words found\n", found_count, word_count);
         
         if (found_count == word_count) {
+            gtk_label_set_text(GTK_LABEL(app->message_label), "SUCCESS! All words found!");
+            gtk_widget_set_name(app->message_label, "message_error");
+
             printf("\n🎉 SUCCESS! All words found!\n");
         } else if (found_count > 0) {
+            gtk_label_set_text(GTK_LABEL(app->message_label), "Partial success - not all the words found.");
+            gtk_widget_set_name(app->message_label, "message_error");
+
             printf("\n⚠️  Partial success - %d/%d words found.\n", found_count, word_count);
         } else {
+            gtk_label_set_text(GTK_LABEL(app->message_label), "No words found");
+            gtk_widget_set_name(app->message_label, "message_error");
             printf("\n⚠️  No words found. Check OCR accuracy.\n");
         }
         

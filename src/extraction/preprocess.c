@@ -77,7 +77,7 @@ SDL_Surface* binarize_image(const char* input_path)
     int W = img->w, H = img->h, N = W * H;
     uint32_t* p = (uint32_t*)img->pixels;
     
-    uint8_t* Y = (uint8_t*)malloc(N);
+    uint8_t* Y = (uint8_t*)calloc(1,N);
     //graying all pixels
     for (int i = 0; i < N; i++) Y[i] = gray_from_rgb(p[i]);
     //then threshold the entire picture

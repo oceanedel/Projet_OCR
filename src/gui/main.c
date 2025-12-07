@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include "solving.c"
 #include "../autorotation/rotation.h"
+#include "solving.h"
 
 // Extraction modules
 #include "../extraction/preprocess.h"
@@ -46,18 +47,12 @@
 #include "../ocr/word_processor.h"
 
 
+
+
 #include <dirent.h>
 
-typedef struct {
-    GtkWidget *window;
-    GtkWidget *drawing_area;
-    GtkWidget *scale;
-    GtkWidget *angle_entry;
-    GdkPixbuf *pixbuf;        /* original pixbuf */
-    int pixbuf_width;
-    int pixbuf_height;
-    double angle_deg;
-} AppData;
+
+
 
 /* Compute bounding box of rotated rectangle */
 static void compute_rotated_size(int w, int h, double angle_deg, int *out_w, int *out_h) {
@@ -206,14 +201,17 @@ static void rotate_by(AppData *app, double delta) {
 }
 
 static void on_button_left(GtkButton *btn, gpointer user_data) {
+    (void )btn;
     rotate_by((AppData*)user_data, -5.0);
 }
 
 static void on_button_right(GtkButton *btn, gpointer user_data) {
+    (void )btn;
     rotate_by((AppData*)user_data, 5.0);
 }
 
 static void on_apply_angle(GtkButton *btn, gpointer user_data) {
+    (void )btn;
     AppData *app = (AppData*)user_data;
     const char *txt = gtk_entry_get_text(GTK_ENTRY(app->angle_entry));
     if (!txt) return;
@@ -229,10 +227,11 @@ static void on_apply_angle(GtkButton *btn, gpointer user_data) {
 
 static void on_solve(GtkButton *btn, gpointer user_data) {
     (void)btn;
-    (void)user_data;
-    
-    // 1. Run your solving pipeline (this calls OCR, solver, etc.)
-    launch_solving("../../output/image.bmp");
+    AppData *app = (AppData*)user_data;
+    gtk_label_set_text(GTK_LABEL(app->message_label), "Grid solving in progress...");
+
+    gtk_widget_set_name(app->message_label, "message_error"); 
+    launch_solving("../../output/image.bmp", user_data);
 
     
 }
@@ -240,6 +239,7 @@ static void on_solve(GtkButton *btn, gpointer user_data) {
 
 static void on_auto_rotation(GtkButton *btn, gpointer user_data)
 {
+    (void )btn;
     AppData *app = (AppData*)user_data;
     if (!app->pixbuf) return;
     const char *temp_input_path = "../../output/grid_before_autorotate.bmp";
@@ -274,6 +274,7 @@ static void on_auto_rotation(GtkButton *btn, gpointer user_data)
 
 /* Open file chooser and load image */
 static void on_open(GtkButton *btn, gpointer user_data) {
+    (void )btn;
     AppData *app = (AppData*)user_data;
     GtkWidget *dialog = gtk_file_chooser_dialog_new("Open an image",
                                                     GTK_WINDOW(app->window),
@@ -334,6 +335,9 @@ static void on_open(GtkButton *btn, gpointer user_data) {
 
         g_free(filename);
     }
+    gtk_label_set_text(GTK_LABEL(app->message_label), "");
+
+    gtk_widget_set_name(app->message_label, "message_error"); 
     gtk_widget_destroy(dialog);
 
     
@@ -407,6 +411,11 @@ int main(int argc, char *argv[]) {
     gtk_container_add(GTK_CONTAINER(image_frame), app.drawing_area);
     g_signal_connect(app.drawing_area, "draw", G_CALLBACK(on_draw), &app);
 
+    app.message_label = gtk_label_new("");
+    gtk_widget_set_name(app.message_label, "message_label");
+    
+    gtk_box_pack_end(GTK_BOX(vbox), app.message_label, FALSE, FALSE, 5);
+
 
     GtkWidget *solve_btn = gtk_button_new_with_label("Solve Grid");
     g_signal_connect(solve_btn, "clicked", G_CALLBACK(on_solve), &app);
@@ -421,7 +430,8 @@ int main(int argc, char *argv[]) {
         "window#main_window { background-color: #5C5656 ;}"
         "entry {  background: white ;color: #5C5656;border-radius: 6px; padding: 4px; font-weight: bold;}"
         "scale { margin-top: 5px; font-weight: bold; color :white;}"
-        "frame label { font-weight: bold; color:#5C5656 ;}", -1, NULL);
+        "frame label { font-weight: bold; color:#5C5656 ;}"
+        "label#message_label { color: #FF0000; font-weight: bold; margin: 5px; }",-1, NULL);
 
     gtk_style_context_add_provider_for_screen(gdk_screen_get_default(),
         GTK_STYLE_PROVIDER(provider), GTK_STYLE_PROVIDER_PRIORITY_USER);
