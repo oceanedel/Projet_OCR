@@ -1,4 +1,0 @@
-horizontal
-vertical
-world
-goldorak

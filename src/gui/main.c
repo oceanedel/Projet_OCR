@@ -229,8 +229,8 @@ static void on_solve(GtkButton *btn, gpointer user_data) {
     (void)btn;
     AppData *app = (AppData*)user_data;
     gtk_label_set_text(GTK_LABEL(app->message_label), "Grid solving in progress...");
-
     gtk_widget_set_name(app->message_label, "message_error"); 
+
     launch_solving("../../output/image.bmp", user_data);
 
     
@@ -241,8 +241,10 @@ static void on_auto_rotation(GtkButton *btn, gpointer user_data)
 {
     (void )btn;
     AppData *app = (AppData*)user_data;
+
+   
     if (!app->pixbuf) return;
-    const char *temp_input_path = "../../output/grid_before_autorotate.bmp";
+    const char *temp_input_path = "../../output/image.bmp";
 
 
     char *output_path = rotate_original_auto((char *)temp_input_path);
