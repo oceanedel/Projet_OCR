@@ -153,14 +153,17 @@ void detect_edges(iImage *image, double **edges, double **angles)
 
         double gradient_angle = atan2(gy, gx) * 180.0 / PI;
 
-        double edge_orientation = gradient_angle + 90.0;
+        double angle = gradient_angle;
+        
+        // 1. On ramène tout entre -90 et 90
+        while (angle <= -90.0) angle += 180.0;
+        while (angle > 90.0)   angle -= 180.0;
 
-        if (edge_orientation < 0.0)
-          edge_orientation += 180.0;
-        else if (edge_orientation >= 180.0)
-          edge_orientation -= 180.0;
+        if (angle > 45.0) angle -= 90.0;
+        else if (angle <= -45.0) angle += 90.0;
 
-        angles[y][x] = edge_orientation;
+        angles[y][x] = angle;
+
       } else {
         edges[y][x] = 0.0;
         angles[y][x] = 0.0;
@@ -260,7 +263,7 @@ double determine_rotation_angle(iImage *image)
     return 0.0;
   }
 
-  return dominant_angle+2.0;
+  return dominant_angle+3.0;
 }
 
 /*

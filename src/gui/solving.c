@@ -42,6 +42,7 @@ void clean_output() {
     res=system("rm -f ../../output/cells/*.bmp 2>/dev/null");
     res=system("rm -f ../../output/words/*.bmp 2>/dev/null");
     res=system("rm -f ../../output/word_letters/*.bmp 2>/dev/null");
+    res=system("rm -f ../../dataset/*/*.Identifier 2>/dev/null");
     (void)res;
     printf("[CLEANUP] ✓ Output directory cleaned\n");
 }

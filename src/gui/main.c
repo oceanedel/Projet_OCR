@@ -123,25 +123,7 @@ static void on_scale_value_changed(GtkRange *range, gpointer user_data) {
     gtk_widget_queue_draw(app->drawing_area);
 }
 
-/* Resize pixbuf to fit memory-wise (optional) */
-static void resize_pixbuf_to_fit(AppData *app, int max_width, int max_height) {
-    if (!app->pixbuf) return;
 
-    int w = gdk_pixbuf_get_width(app->pixbuf);
-    int h = gdk_pixbuf_get_height(app->pixbuf);
-
-    double scale = fmin((double)max_width / w, (double)max_height / h);
-    if (scale >= 1.0) return;
-
-    int new_w = (int)(w * scale);
-    int new_h = (int)(h * scale);
-
-    GdkPixbuf *scaled = gdk_pixbuf_scale_simple(app->pixbuf, new_w, new_h, GDK_INTERP_BILINEAR);
-    g_object_unref(app->pixbuf);
-    app->pixbuf = scaled;
-    app->pixbuf_width = new_w;
-    app->pixbuf_height = new_h;
-}
 
 
 
@@ -231,11 +213,14 @@ static void on_solve(GtkButton *btn, gpointer user_data) {
     gtk_label_set_text(GTK_LABEL(app->message_label), "Grid solving in progress...");
     gtk_widget_set_name(app->message_label, "message_error"); 
 
+    while (gtk_events_pending()) {
+        gtk_main_iteration();
+    }
+
     launch_solving("../../output/image.bmp", user_data);
 
     
 }
-
 
 static void on_auto_rotation(GtkButton *btn, gpointer user_data)
 {
@@ -244,6 +229,7 @@ static void on_auto_rotation(GtkButton *btn, gpointer user_data)
 
     if (!app->pixbuf) return;
 
+    // 1. Sauvegarde temporaire pour l'analyse
     const char *temp_input_path = "../../output/grid_before_autorotate.bmp";
     GError *error = NULL;
 
@@ -252,13 +238,35 @@ static void on_auto_rotation(GtkButton *btn, gpointer user_data)
         g_error_free(error);
         return;
     }
+
+    // 2. Détection de l'angle
+    iImage *image = load_image(temp_input_path, -1);
+    if (!image) return;
+
+    double angle_detected = determine_rotation_angle(image); 
+    // Libération de la structure iImage si nécessaire (dépend de votre implémentation de load_image)
+    // free_image(image); 
+
+    // 3. CAS 1 : L'image est déjà droite
+    if (fabs(angle_detected) < 0.1) {
+        g_print("Auto-rotate: Image déjà droite (correction < 0.1°)\n");
+        app->angle_deg = 0.0;
+        gtk_range_set_value(GTK_RANGE(app->scale), 0.0);
+        gtk_entry_set_text(GTK_ENTRY(app->angle_entry), "0");
+        
+        // CORRECTION ICI : On sauvegarde quand même l'image actuelle pour le solveur !
+        save_rotated_bmp(app); 
+        return; 
+    }
+
+    // 4. CAS 2 : Rotation nécessaire
     char *output_path = rotate_original_auto((char *)temp_input_path);
-    
     if (!output_path) {
         g_printerr("Auto-rotation failed\n");
         return;
     }
 
+    // Chargement de l'image tournée
     GError *error2 = NULL;
     GdkPixbuf *rot = gdk_pixbuf_new_from_file(output_path, &error2);
     if (!rot) {
@@ -268,25 +276,47 @@ static void on_auto_rotation(GtkButton *btn, gpointer user_data)
         return;
     }
 
+    // --- CORRECTION CRITIQUE POUR L'OCR : NETTOYAGE DES BORDS NOIRS ---
+    // On transforme les pixels noirs (0,0,0) ajoutés par la rotation en blanc (255,255,255)
+    int n_channels = gdk_pixbuf_get_n_channels(rot);
+    int rowstride = gdk_pixbuf_get_rowstride(rot);
+    guchar *pixels = gdk_pixbuf_get_pixels(rot);
+    int w = gdk_pixbuf_get_width(rot);
+    int h = gdk_pixbuf_get_height(rot);
+
+    for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
+            guchar *p = pixels + y * rowstride + x * n_channels;
+            // Si le pixel est presque noir (artefact de rotation)
+            if (p[0] < 20 && p[1] < 20 && p[2] < 20) {
+                p[0] = 255; // R -> Blanc
+                p[1] = 255; // G -> Blanc
+                p[2] = 255; // B -> Blanc
+            }
+        }
+    }
+    // -------------------------------------------------------------------
+
+    // Remplacement de l'image dans l'application
     if (app->pixbuf)
         g_object_unref(app->pixbuf);
 
     app->pixbuf = rot;
-    app->pixbuf_width = gdk_pixbuf_get_width(rot);
-    app->pixbuf_height = gdk_pixbuf_get_height(rot);
+    app->pixbuf_width = w;
+    app->pixbuf_height = h;
 
+    // Reset des contrôles UI
     app->angle_deg = 0.0;
     gtk_range_set_value(GTK_RANGE(app->scale), 0.0);
     gtk_entry_set_text(GTK_ENTRY(app->angle_entry), "0");
 
-    resize_pixbuf_to_fit(app, 900, 600); 
-
-    gtk_widget_queue_draw(app->drawing_area);
-
+    // 5. Sauvegarde finale pour l'OCR
     save_rotated_bmp(app); 
 
+    gtk_widget_queue_draw(app->drawing_area);
     free(output_path);
 }
+
 /* Open file chooser and load image */
 static void on_open(GtkButton *btn, gpointer user_data) {
     (void )btn;
@@ -330,7 +360,8 @@ static void on_open(GtkButton *btn, gpointer user_data) {
         app->pixbuf_height = gdk_pixbuf_get_height(pix);
         app->angle_deg = 0.0;
         gtk_range_set_value(GTK_RANGE(app->scale), 0.0);
-        resize_pixbuf_to_fit(app, 900, 600);
+
+
         gtk_widget_queue_draw(app->drawing_area);
 
         //save as image.bmp
@@ -443,10 +474,13 @@ int main(int argc, char *argv[]) {
         "button:hover { background:#B5AEAE ; }"
         "frame#header_frame {border:none;}"
         "window#main_window { background-color: #5C5656 ;}"
-        "entry {  background: white ;color: #5C5656;border-radius: 6px; padding: 4px; font-weight: bold;}"
+        "entry { background: white ;color: #5C5656;border-radius: 6px; padding: 4px; font-weight: bold;}"
         "scale { margin-top: 5px; font-weight: bold; color :white;}"
         "frame label { font-weight: bold; color:#5C5656 ;}"
-        "label#message_label { color: #FF0000; font-weight: bold; margin: 5px; }",-1, NULL);
+
+        "label#message_error { color: white; font-weight: bold; font-size: 20px; margin: 6px; }"
+        "label#message_label { color: white; font-weight: bold; font-size: 20px; margin: 6px; }",
+        -1, NULL);
 
     gtk_style_context_add_provider_for_screen(gdk_screen_get_default(),
         GTK_STYLE_PROVIDER(provider), GTK_STYLE_PROVIDER_PRIORITY_USER);

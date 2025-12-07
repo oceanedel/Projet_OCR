@@ -10,13 +10,13 @@
 #include <time.h>
 #include <sys/stat.h>
 
-#define INPUT_SIZE 784
-#define HIDDEN_SIZE 32
+#define INPUT_SIZE 1024
+#define HIDDEN_SIZE 128
 #define OUTPUT_SIZE 26
 #define LEARNING_RATE 0.01
 #define MAX_TEMPLATES_PER_LETTER 1300
 #define TEMPLATE_SIZE 32
-#define EPOCHS 10  // Modifie cette valeur si tu veux plus/moins d'époques
+#define EPOCHS 20  // Modifie cette valeur si tu veux plus/moins d'époques
 
 float input[INPUT_SIZE];
 float hidden[HIDDEN_SIZE];
@@ -27,6 +27,9 @@ float bH[HIDDEN_SIZE];              // biais hidden
 
 float wHO[HIDDEN_SIZE][OUTPUT_SIZE]; // poids hidden-output
 float bO[OUTPUT_SIZE];               // biais output
+
+
+static int is_sdl_initialized = 0;
 
 //remplir un tableau 1D depuis un fichier texte
 void load1D(const char *filename, float *array, int size)
@@ -241,6 +244,19 @@ void back_propagation(int index_letter)
     update_IH(errorH);
 }
 
+
+// Ajoute un léger bruit aléatoire à l'entrée pour robustifier l'apprentissage
+void add_noise(float strength) {
+    for (int i = 0; i < INPUT_SIZE; i++) {
+        // Ajoute une valeur entre -strength et +strength
+        float noise = ((float)rand() / (float)RAND_MAX - 0.5f) * 2.0f * strength;
+        input[i] += noise;
+        // Clamp pour rester entre 0 et 1 (optionnel mais recommandé)
+        if (input[i] < 0.0f) input[i] = 0.0f;
+        if (input[i] > 1.0f) input[i] = 1.0f;
+    }
+}
+
 //entraine le réseau avec des images données
 void training(int index_letter, float **img)
 {
@@ -256,6 +272,8 @@ void training(int index_letter, float **img)
             n++;
         }
     }
+
+    add_noise(0.05f);
     forward();
     back_propagation(index_letter);
 }
@@ -603,17 +621,18 @@ char letter_recognition(float **img)
 }
 
 
-/*
-int main(int argc, char **argv)
-{
-    if (argc!=2) errx(EXIT_FAILURE,"mauvais arguments. usage: %s image.png", argv[0]);
 
-    // initialisation SDL
+// Fonction helper pour initialiser la SDL une seule fois
+void ensure_sdl_initialized()
+{
+    if (is_sdl_initialized) return; // Si déjà init, on ne fait rien
+
+    // Initialisation SDL
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         errx(EXIT_FAILURE, "SDL_Init Failed: %s\n", SDL_GetError());
     }
 
-    // initialisation SDL_image (PNG/JPG)
+    // Initialisation SDL_image (PNG/JPG)
     int img_flags = IMG_INIT_PNG | IMG_INIT_JPG;
     if ((IMG_Init(img_flags) & img_flags) != img_flags) {
         fprintf(stderr, "IMG_Init Failed: %s\n", IMG_GetError());
@@ -621,83 +640,25 @@ int main(int argc, char **argv)
         errx(EXIT_FAILURE, "Impossible d'initialiser SDL_image");
     }
 
-    // initialisation aleatoire
-    srand((unsigned int)time(NULL));
+    // On marque comme initialisé pour ne plus repasser ici
+    is_sdl_initialized = 1;
 
-    // lance le training si tous les fichiers bH, bO ... n'existent pas
-    FILE *file = fopen( "bH.txt", "r");
-    if (file)
-    {
-        fclose(file);
-    }
-    else train();
-
-
-    // Vérifie après training que les fichiers existent
-    FILE *file1 = fopen( "bH.txt", "r");
-    if (file1)
-    {
-        fclose(file1);
-    }
-    else {
-        IMG_Quit();
-        SDL_Quit();
-        errx(EXIT_FAILURE,"erreur lors du training");
-    }
-
-    char *path=argv[1];
-
-    SDL_Surface *img = IMG_Load(path); // utilise IMG_Load pour PNG/JPG/BMP
-    if (!img) {
-        IMG_Quit();
-        SDL_Quit();
-        errx(EXIT_FAILURE, "erreur lors du chargement de l'image: %s", IMG_GetError());
-    }
-
-    SDL_Surface *norm = normalize_size(img, TEMPLATE_SIZE, TEMPLATE_SIZE);
-    SDL_FreeSurface(img);
-    if (!norm) {
-        IMG_Quit();
-        SDL_Quit();
-        errx(EXIT_FAILURE, "normalize_size a échoué");
-    }
-
-    float **img_pixel = surface_to_grayscale(norm);
-    SDL_FreeSurface(norm);
-    if (!img_pixel) {
-        IMG_Quit();
-        SDL_Quit();
-        errx(EXIT_FAILURE, "surface_to_grayscale a échoué");
-    }
-
-    // Reconnaissance
-    char res = letter_recognition(img_pixel);
-
-    // Libération complète
-    for (int y = 0; y < TEMPLATE_SIZE; y++) free(img_pixel[y]);
-    free(img_pixel);
-
-    printf("\nRésultat: %c\n", res);
-
-    IMG_Quit();
-    SDL_Quit();
-    return 0;
+    // Optionnel : on demande à fermer proprement la SDL quand le programme entier s'arrête
+    atexit(IMG_Quit);
+    atexit(SDL_Quit);
 }
-*/
+
 
 char recognize_letter(char *path_letter)
 {
-    // initialisation SDL
-    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
-        errx(EXIT_FAILURE, "SDL_Init Failed: %s\n", SDL_GetError());
-    }
+    ensure_sdl_initialized();
 
-    // initialisation SDL_image (PNG/JPG)
-    int img_flags = IMG_INIT_PNG | IMG_INIT_JPG;
-    if ((IMG_Init(img_flags) & img_flags) != img_flags) {
-        fprintf(stderr, "IMG_Init Failed: %s\n", IMG_GetError());
-        SDL_Quit();
-        errx(EXIT_FAILURE, "Impossible d'initialiser SDL_image");
+    // initialisation aléatoire (peut rester ici ou bouger dans ensure_sdl_initialized)
+    // On met un static pour éviter de reset le seed à chaque appel rapide
+    static int rand_init = 0;
+    if (!rand_init) {
+        srand((unsigned int)time(NULL));
+        rand_init = 1;
     }
 
     // initialisation aleatoire
