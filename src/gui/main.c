@@ -242,16 +242,23 @@ static void on_auto_rotation(GtkButton *btn, gpointer user_data)
     (void )btn;
     AppData *app = (AppData*)user_data;
 
-   
     if (!app->pixbuf) return;
-    const char *temp_input_path = "../../output/image.bmp";
 
+    const char *temp_input_path = "../../output/grid_before_autorotate.bmp";
+    GError *error = NULL;
 
+    if (!gdk_pixbuf_save(app->pixbuf, temp_input_path, "bmp", &error, NULL)) {
+        g_printerr("Error saving temp image for rotation: %s\n", error->message);
+        g_error_free(error);
+        return;
+    }
     char *output_path = rotate_original_auto((char *)temp_input_path);
+    
     if (!output_path) {
         g_printerr("Auto-rotation failed\n");
         return;
     }
+
     GError *error2 = NULL;
     GdkPixbuf *rot = gdk_pixbuf_new_from_file(output_path, &error2);
     if (!rot) {
@@ -260,20 +267,26 @@ static void on_auto_rotation(GtkButton *btn, gpointer user_data)
         free(output_path);
         return;
     }
+
     if (app->pixbuf)
         g_object_unref(app->pixbuf);
 
     app->pixbuf = rot;
     app->pixbuf_width = gdk_pixbuf_get_width(rot);
     app->pixbuf_height = gdk_pixbuf_get_height(rot);
+
     app->angle_deg = 0.0;
     gtk_range_set_value(GTK_RANGE(app->scale), 0.0);
     gtk_entry_set_text(GTK_ENTRY(app->angle_entry), "0");
+
+    resize_pixbuf_to_fit(app, 900, 600); 
+
     gtk_widget_queue_draw(app->drawing_area);
+
+    save_rotated_bmp(app); 
 
     free(output_path);
 }
-
 /* Open file chooser and load image */
 static void on_open(GtkButton *btn, gpointer user_data) {
     (void )btn;

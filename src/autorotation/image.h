@@ -6,12 +6,14 @@
 
 #define PI 3.14159265
 
-typedef struct pPixel {
+typedef struct pPixel 
+{
   Uint8 r, g, b;
   struct pPixel *matrix;
 } pPixel;
 
-typedef struct iImage {
+typedef struct iImage 
+{
   int height, width;
   char *path;
   pPixel **pixels;
