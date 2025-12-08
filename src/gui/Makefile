@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -Werror -O2 $(shell pkg-config --cflags gtk+-3.0 sdl2 SDL2_image)
+CFLAGS = -Wall -Wextra -O2 $(shell pkg-config --cflags gtk+-3.0 sdl2 SDL2_image)
 LDLIBS = $(shell pkg-config --libs gtk+-3.0 sdl2 SDL2_image) -lm
 
 
