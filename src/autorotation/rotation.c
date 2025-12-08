@@ -263,7 +263,7 @@ double determine_rotation_angle(iImage *image)
     return 0.0;
   }
 
-  return dominant_angle+3.0;
+  return dominant_angle+4.0;
 }
 
 /*

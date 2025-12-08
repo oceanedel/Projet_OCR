@@ -616,7 +616,7 @@ char letter_recognition(float **img)
         if (output[i]>output[max]) max=i;
     }
 
-    printf("\nLetter reconnu : %c  avec une proba de %.3f\n",'A'+max,output[max]);
+   // printf("\nLetter reconnu : %c  avec une proba de %.3f\n",'A'+max,output[max]);
     return (char)('A'+max);
 }
 
@@ -710,7 +710,7 @@ char recognize_letter(char *path_letter)
         errx(EXIT_FAILURE, "surface_to_grayscale a échoué");
     }
 
-    printf("image situé à l'endroit : %s",path);
+   // printf("image situé à l'endroit : %s",path);
     // Reconnaissance
     char res = letter_recognition(img_pixel);
 

@@ -25,6 +25,7 @@
 #include "solving.c"
 #include "../autorotation/rotation.h"
 #include "solving.h"
+#include <SDL2/SDL.h>
 
 // Extraction modules
 #include "../extraction/preprocess.h"
@@ -35,6 +36,7 @@
 #include "../extraction/slice_letter_word.h"
 #include "../extraction/trim_cells.h"
 #include "../extraction/trim_word_letters.h"
+#include "../extraction/denoiser.h"
 
 
 // Solver wrapper
@@ -222,100 +224,156 @@ static void on_solve(GtkButton *btn, gpointer user_data) {
     
 }
 
-static void on_auto_rotation(GtkButton *btn, gpointer user_data)
+
+static void denoiser(GtkButton *btn, gpointer user_data)
 {
-    (void )btn;
-    AppData *app = (AppData*)user_data;
+    (void)btn; 
+    AppData *app = (AppData *)user_data;
 
-    if (!app->pixbuf) return;
-
-    // 1. Sauvegarde temporaire pour l'analyse
-    const char *temp_input_path = "../../output/grid_before_autorotate.bmp";
-    GError *error = NULL;
-
-    if (!gdk_pixbuf_save(app->pixbuf, temp_input_path, "bmp", &error, NULL)) {
-        g_printerr("Error saving temp image for rotation: %s\n", error->message);
-        g_error_free(error);
+    if (!app->pixbuf) {
+        gtk_label_set_text(GTK_LABEL(app->message_label), "No image to denoise");
+        gtk_widget_set_name(app->message_label, "message_error");
         return;
     }
 
-    // 2. Détection de l'angle
-    iImage *image = load_image(temp_input_path, -1);
-    if (!image) return;
+    save_rotated_bmp(app); 
+    const char *filepath = "../../output/image.bmp";
 
-    double angle_detected = determine_rotation_angle(image); 
-    // Libération de la structure iImage si nécessaire (dépend de votre implémentation de load_image)
-    // free_image(image); 
-
-    // 3. CAS 1 : L'image est déjà droite
-    if (fabs(angle_detected) < 0.1) {
-        g_print("Auto-rotate: Image déjà droite (correction < 0.1°)\n");
-        app->angle_deg = 0.0;
-        gtk_range_set_value(GTK_RANGE(app->scale), 0.0);
-        gtk_entry_set_text(GTK_ENTRY(app->angle_entry), "0");
-        
-        // CORRECTION ICI : On sauvegarde quand même l'image actuelle pour le solveur !
-        save_rotated_bmp(app); 
-        return; 
-    }
-
-    // 4. CAS 2 : Rotation nécessaire
-    char *output_path = rotate_original_auto((char *)temp_input_path);
-    if (!output_path) {
-        g_printerr("Auto-rotation failed\n");
+    SDL_Surface *src_surface = SDL_LoadBMP(filepath);
+    if (!src_surface) {
+        g_printerr("SDL Load Error: %s\n", SDL_GetError());
+        gtk_label_set_text(GTK_LABEL(app->message_label), "Error loading for denoise");
+        gtk_widget_set_name(app->message_label, "message_error");
         return;
     }
 
-    // Chargement de l'image tournée
-    GError *error2 = NULL;
-    GdkPixbuf *rot = gdk_pixbuf_new_from_file(output_path, &error2);
-    if (!rot) {
-        g_printerr("Error loading rotated image: %s\n", error2->message);
-        g_error_free(error2);
-        free(output_path);
+    SDL_Surface *denoised_surface = denoise_image(src_surface);
+    SDL_FreeSurface(src_surface);
+
+    if (!denoised_surface) {
+        gtk_label_set_text(GTK_LABEL(app->message_label), "Denoising failed");
+        gtk_widget_set_name(app->message_label, "message_error");
         return;
     }
 
-    // --- CORRECTION CRITIQUE POUR L'OCR : NETTOYAGE DES BORDS NOIRS ---
-    // On transforme les pixels noirs (0,0,0) ajoutés par la rotation en blanc (255,255,255)
-    int n_channels = gdk_pixbuf_get_n_channels(rot);
-    int rowstride = gdk_pixbuf_get_rowstride(rot);
-    guchar *pixels = gdk_pixbuf_get_pixels(rot);
-    int w = gdk_pixbuf_get_width(rot);
-    int h = gdk_pixbuf_get_height(rot);
-
-    for (int y = 0; y < h; y++) {
-        for (int x = 0; x < w; x++) {
-            guchar *p = pixels + y * rowstride + x * n_channels;
-            // Si le pixel est presque noir (artefact de rotation)
-            if (p[0] < 20 && p[1] < 20 && p[2] < 20) {
-                p[0] = 255; // R -> Blanc
-                p[1] = 255; // G -> Blanc
-                p[2] = 255; // B -> Blanc
-            }
-        }
+    if (SDL_SaveBMP(denoised_surface, filepath) != 0) {
+        g_printerr("SDL Save Error: %s\n", SDL_GetError());
+        SDL_FreeSurface(denoised_surface);
+        return;
     }
-    // -------------------------------------------------------------------
+    SDL_FreeSurface(denoised_surface);
 
-    // Remplacement de l'image dans l'application
-    if (app->pixbuf)
-        g_object_unref(app->pixbuf);
+    GError *err = NULL;
+    GdkPixbuf *new_pix = gdk_pixbuf_new_from_file(filepath, &err);
+    if (!new_pix) {
+        g_printerr("Reload Pixbuf Error: %s\n", err->message);
+        g_error_free(err);
+        return;
+    }
 
-    app->pixbuf = rot;
-    app->pixbuf_width = w;
-    app->pixbuf_height = h;
+    if (app->pixbuf) g_object_unref(app->pixbuf);
+    app->pixbuf = new_pix;
+    app->pixbuf_width = gdk_pixbuf_get_width(new_pix);
+    app->pixbuf_height = gdk_pixbuf_get_height(new_pix);
 
-    // Reset des contrôles UI
     app->angle_deg = 0.0;
     gtk_range_set_value(GTK_RANGE(app->scale), 0.0);
     gtk_entry_set_text(GTK_ENTRY(app->angle_entry), "0");
 
-    // 5. Sauvegarde finale pour l'OCR
+    gtk_widget_queue_draw(app->drawing_area);
+    gtk_label_set_text(GTK_LABEL(app->message_label), "Denoise applied successfully!");
+    gtk_widget_set_name(app->message_label, "message_label");
+    
+    printf("Denoise applied and reloaded.\n");
+}
+
+
+
+static void on_auto_rotation(GtkButton *btn, gpointer user_data)
+{
+    (void)btn;
+    AppData *app = (AppData*)user_data;
+
+    if (!app->pixbuf) return;
+
+    const char *temp_input_path = "../../output/grid_before_autorotate.bmp";
+    
+    // On boucle 2 fois pour affiner la rotation
+    for (int i = 0; i < 2; i++) 
+    {
+        GError *error = NULL;
+
+        // 1. IMPORTANT : On sauvegarde l'état ACTUEL de l'image sur le disque
+        // Cela permet à la 2ème itération de travailler sur le résultat de la 1ère.
+        if (!gdk_pixbuf_save(app->pixbuf, temp_input_path, "bmp", &error, NULL)) {
+            g_printerr("Error saving temp image for rotation loop %d: %s\n", i, error->message);
+            g_error_free(error);
+            break; // On arrête si on ne peut pas sauvegarder
+        }
+
+        // 2. Appel de la fonction de rotation (détection + correction)
+        char *output_path = rotate_original_auto((char *)temp_input_path);
+        
+        if (!output_path) {
+            // Si output_path est NULL, c'est que la rotation a échoué ou n'était pas nécessaire
+            g_print("Auto-rotation step %d skipped or failed.\n", i + 1);
+            continue; 
+        }
+
+        // 3. Chargement de l'image corrigée
+        GdkPixbuf *rot = gdk_pixbuf_new_from_file(output_path, &error);
+        
+        // On libère le chemin retourné par la fonction
+        free(output_path);
+
+        if (!rot) {
+            g_printerr("Error loading rotated image loop %d: %s\n", i, error->message);
+            g_error_free(error);
+            break;
+        }
+
+        // 4. Nettoyage des bords noirs (Artefacts de rotation)
+        int w = gdk_pixbuf_get_width(rot);
+        int h = gdk_pixbuf_get_height(rot);
+        int n_channels = gdk_pixbuf_get_n_channels(rot);
+        int rowstride = gdk_pixbuf_get_rowstride(rot);
+        guchar *pixels = gdk_pixbuf_get_pixels(rot);
+
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                guchar *p = pixels + y * rowstride + x * n_channels;
+                // Si le pixel est presque noir (artefact) -> on le met en blanc
+                if (p[0] < 20 && p[1] < 20 && p[2] < 20) {
+                    p[0] = 255; // R
+                    p[1] = 255; // G
+                    p[2] = 255; // B
+                }
+            }
+        }
+
+        // 5. Mise à jour de l'image de l'application pour la prochaine itération
+        if (app->pixbuf)
+            g_object_unref(app->pixbuf);
+
+        app->pixbuf = rot;
+        app->pixbuf_width = w;
+        app->pixbuf_height = h;
+        
+        g_print("Auto-rotation pass %d applied.\n", i + 1);
+    }
+
+    // Reset des contrôles UI (curseurs à 0 car l'image est maintenant "droite" en interne)
+    app->angle_deg = 0.0;
+    gtk_range_set_value(GTK_RANGE(app->scale), 0.0);
+    gtk_entry_set_text(GTK_ENTRY(app->angle_entry), "0");
+
+    // Sauvegarde finale pour que le Solveur/OCR utilise la dernière version
     save_rotated_bmp(app); 
 
     gtk_widget_queue_draw(app->drawing_area);
-    free(output_path);
 }
+
+
 
 /* Open file chooser and load image */
 static void on_open(GtkButton *btn, gpointer user_data) {
@@ -430,7 +488,7 @@ int main(int argc, char *argv[]) {
 
     app.angle_entry = gtk_entry_new();
     gtk_entry_set_placeholder_text(GTK_ENTRY(app.angle_entry), "Angle (°)");
-    gtk_widget_set_size_request(app.angle_entry, 100, -1);
+    gtk_widget_set_size_request(app.angle_entry, 50, -1);
     gtk_box_pack_start(GTK_BOX(header_box), app.angle_entry, FALSE, FALSE, 0);
 
     GtkWidget *apply_btn = gtk_button_new_with_label("Apply");
@@ -440,6 +498,11 @@ int main(int argc, char *argv[]) {
     GtkWidget *auto_btn = gtk_button_new_with_label("⟳ Auto-Rotate");
     g_signal_connect(auto_btn, "clicked", G_CALLBACK(on_auto_rotation), &app);
     gtk_box_pack_start(GTK_BOX(header_box), auto_btn, FALSE, FALSE, 0);
+
+    GtkWidget *denoise_btn = gtk_button_new_with_label("Denoise");
+    g_signal_connect(denoise_btn, "clicked", G_CALLBACK(denoiser), &app);
+    gtk_box_pack_start(GTK_BOX(header_box), denoise_btn, FALSE, FALSE,0);
+
 
 
 

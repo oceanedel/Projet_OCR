@@ -61,10 +61,13 @@ output/*.bmp
 output/words/*
 output/word_letters/*
 output/grid.txt
+output/word.txt
+
 
 #exec
 build/bin/*
 
 
 
-*:Zone.Identifier
+*.Identifier
+
