@@ -164,8 +164,8 @@ static void save_rotated_bmp(AppData *app) {
 
     if (dest) {
         GError *err = NULL;
-        /* Save to ../../output/image.bmp */
-        if (!gdk_pixbuf_save(dest, "../../output/image.bmp", "bmp", &err, NULL)) {
+        /* Save to ./output/image.bmp */
+        if (!gdk_pixbuf_save(dest, "./output/image.bmp", "bmp", &err, NULL)) {
              g_printerr("Failed to save rotated image: %s\n", err ? err->message : "Unknown error");
              if (err) g_error_free(err);
         } else {
@@ -219,7 +219,7 @@ static void on_solve(GtkButton *btn, gpointer user_data) {
         gtk_main_iteration();
     }
 
-    launch_solving("../../output/image.bmp", user_data);
+    launch_solving("./output/image.bmp", user_data);
 
     
 }
@@ -237,7 +237,7 @@ static void denoiser(GtkButton *btn, gpointer user_data)
     }
 
     save_rotated_bmp(app); 
-    const char *filepath = "../../output/image.bmp";
+    const char *filepath = "./output/image.bmp";
 
     SDL_Surface *src_surface = SDL_LoadBMP(filepath);
     if (!src_surface) {
@@ -296,7 +296,7 @@ static void on_auto_rotation(GtkButton *btn, gpointer user_data)
 
     if (!app->pixbuf) return;
 
-    const char *temp_input_path = "../../output/grid_before_autorotate.bmp";
+    const char *temp_input_path = "./output/grid_before_autorotate.bmp";
     
     // On boucle 2 fois pour affiner la rotation
     for (int i = 0; i < 2; i++) 
@@ -429,11 +429,11 @@ static void on_open(GtkButton *btn, gpointer user_data) {
             printf("Erreur lors du chargement : %s\n", SDL_GetError());
             return;
         }
-        if (SDL_SaveBMP(surface,"../../output/image.bmp" ) != 0) {
+        if (SDL_SaveBMP(surface,"./output/image.bmp" ) != 0) {
             printf("Erreur lors de la sauvegarde : %s\n", SDL_GetError());
         } 
         else {
-            printf("Image copiée avec succès vers : %s\n", "../../output/image.bmp");
+            printf("Image copiée avec succès vers : %s\n", "./output/image.bmp");
         }
         SDL_FreeSurface(surface);
 

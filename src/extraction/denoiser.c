@@ -24,7 +24,6 @@ SDL_Surface* denoise_image(SDL_Surface* input) {
         return NULL;
     }
     
-    // Convert to 32-bit ARGB if needed
     SDL_Surface* input_32 = NULL;
     if (input->format->format != SDL_PIXELFORMAT_ARGB8888) {
         input_32 = SDL_ConvertSurfaceFormat(input, SDL_PIXELFORMAT_ARGB8888, 0);
@@ -33,7 +32,7 @@ SDL_Surface* denoise_image(SDL_Surface* input) {
             return NULL;
         }
     } else {
-        input_32 = input; // Already correct format
+        input_32 = input;
     }
     
     // Create output surface
@@ -59,7 +58,7 @@ SDL_Surface* denoise_image(SDL_Surface* input) {
     int w = input_32->w;
     int h = input_32->h;
     
-    // Copy border pixels as-is (no filtering)
+    // Copy border pixels as-is
     Uint32* in_pixels = (Uint32*)input_32->pixels;
     Uint32* out_pixels = (Uint32*)output->pixels;
     
@@ -112,7 +111,6 @@ SDL_Surface* denoise_image(SDL_Surface* input) {
     SDL_UnlockSurface(input_32);
     SDL_UnlockSurface(output);
     
-    // Free temporary surface if we created one
     if (input_32 != input) {
         SDL_FreeSurface(input_32);
     }

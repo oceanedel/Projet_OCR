@@ -71,3 +71,5 @@ build/bin/*
 
 *.Identifier
 
+
+/.vscode

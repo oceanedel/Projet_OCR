@@ -36,13 +36,13 @@
 void clean_output() {
     printf("[CLEANUP] Removing old output files...\n");
     int res;
-    res=system("rm -f  ../../output/binary.bmp ../../output/grid.bmp ../../output/solvingwords.bmp  2>/dev/null");
-    res=system("rm -f ../../output/grid.txt ../../output/words.txt  2>/dev/null");
+    res=system("rm -f  ./output/binary.bmp ./output/grid.bmp ./output/solvingwords.bmp  2>/dev/null");
+    res=system("rm -f ./output/grid.txt ./output/words.txt  2>/dev/null");
     
-    res=system("rm -f ../../output/cells/*.bmp 2>/dev/null");
-    res=system("rm -f ../../output/words/*.bmp 2>/dev/null");
-    res=system("rm -f ../../output/word_letters/*.bmp 2>/dev/null");
-    res=system("rm -f ../../dataset/*/*.Identifier 2>/dev/null");
+    res=system("rm -f ./output/cells/*.bmp 2>/dev/null");
+    res=system("rm -f ./output/words/*.bmp 2>/dev/null");
+    res=system("rm -f ./output/word_letters/*.bmp 2>/dev/null");
+    res=system("rm -f ./dataset/*/*.Identifier 2>/dev/null");
     (void)res;
     printf("[CLEANUP] ✓ Output directory cleaned\n");
 }
@@ -55,7 +55,7 @@ int run_ocr_recognition(const char* cells_dir, const char* words_dir,const char*
     
     // Process words
     if (ret == 0) {
-        process_words(words_dir,words_letters_dir,"../../output/words.txt");
+        process_words(words_dir,words_letters_dir,"./output/words.txt");
         
     }
 
@@ -89,7 +89,7 @@ static void print_highlighted_grid(int rows, int cols) {
     int found_count = 0;
     
     // Find all words and store coordinates
-    FILE* words_file = fopen("../../output/words.txt", "r");
+    FILE* words_file = fopen("./output/words.txt", "r");
     if (words_file) {
         char line[256];
         while (fgets(line, sizeof(line), words_file)) {
@@ -181,8 +181,8 @@ int launch_solving(char *image_path, gpointer user_data)
         return EXIT_FAILURE;
     }
 
-    mkdir("../../output", 0755);
-    SDL_SaveBMP(binary, "../../output/binary.bmp");
+    mkdir("./output", 0755);
+    SDL_SaveBMP(binary, "./output/binary.bmp");
     printf("  ✓ Binary image: output/binary.bmp\n");
 
     // Step 2: Extract grid
@@ -199,15 +199,15 @@ int launch_solving(char *image_path, gpointer user_data)
         return EXIT_FAILURE;
     }
 
-    SDL_SaveBMP(grid, "../../output/grid.bmp");
+    SDL_SaveBMP(grid, "./output/grid.bmp");
     printf("  ✓ Grid region: (%d,%d) size %dx%d\n", grid_x, grid_y, grid_w, grid_h);
     printf("  ✓ Saved: output/grid.bmp\n");
 
     // Step 3: Slice grid into cells
     printf("\n[3/8] Slicing grid into cells...\n");
-    mkdir("../../output/cells", 0755);
+    mkdir("./output/cells", 0755);
 
-    if (slice_grid(grid, "../../output/cells") != 0) {
+    if (slice_grid(grid, "./output/cells") != 0) {
         gtk_label_set_text(GTK_LABEL(app->message_label), "✗ Grid slicing failed");
         gtk_widget_set_name(app->message_label, "message_error");  
         fprintf(stderr, "✗ Grid slicing failed\n");
@@ -223,7 +223,7 @@ int launch_solving(char *image_path, gpointer user_data)
 
     // Step 4: Trim cells
     printf("\n[4/8] Trimming cell whitespace...\n");
-    if (trim_cells("../../output/cells") != 0) {
+    if (trim_cells("./output/cells") != 0) {
         fprintf(stderr, "✗ Cell trimming failed\n");
         SDL_FreeSurface(binary);
         SDL_Quit();
@@ -247,16 +247,16 @@ int launch_solving(char *image_path, gpointer user_data)
         return EXIT_FAILURE;
     }
 
-    SDL_SaveBMP(wordlist, "../../output/solvingwords.bmp");
+    SDL_SaveBMP(wordlist, "./output/solvingwords.bmp");
     printf("  ✓ Word list region: (%d,%d) size %dx%d\n", wl_x, wl_y, wl_w, wl_h);
     printf("  ✓ Saved: output/solvingwords.bmp\n");
 
 
     // Step 6: Slice word list
     printf("\n[6/8] Slicing word list...\n");
-    mkdir("../../output/words", 0755);
+    mkdir("./output/words", 0755);
 
-    if (slice_words(wordlist, "../../output/words") != 0) {
+    if (slice_words(wordlist, "./output/words") != 0) {
         gtk_label_set_text(GTK_LABEL(app->message_label), "✗ Word slicing failed");
         gtk_widget_set_name(app->message_label, "message_error");
         fprintf(stderr, "✗ Word slicing failed\n");
@@ -270,9 +270,9 @@ int launch_solving(char *image_path, gpointer user_data)
 
     // Step 7: Slice word letters
     printf("\n[7/8] Slicing word letters...\n");
-    mkdir("../../output/word_letters", 0755);
+    mkdir("./output/word_letters", 0755);
 
-    if (slice_word_letters("../../output/words", "../../output/word_letters") != 0) {
+    if (slice_word_letters("./output/words", "./output/word_letters") != 0) {
         gtk_label_set_text(GTK_LABEL(app->message_label), "✗ Word letter slicing failed");
         gtk_widget_set_name(app->message_label, "message_error");
         fprintf(stderr, "✗ Word letter slicing failed\n");
@@ -284,7 +284,7 @@ int launch_solving(char *image_path, gpointer user_data)
 
     // Step 8: Trim word letters
     printf("\n[8/8] Trimming word letter whitespace...\n");
-    if (trim_word_letters("../../output/word_letters") != 0) {
+    if (trim_word_letters("./output/word_letters") != 0) {
         gtk_label_set_text(GTK_LABEL(app->message_label), "✗ Word letter trimming failed");
         gtk_widget_set_name(app->message_label, "message_error");
 
@@ -309,7 +309,7 @@ int launch_solving(char *image_path, gpointer user_data)
     printf("  Phase 2: OCR Recognition\n");
     printf("=========================================\n");
     
-    if (run_ocr_recognition("../../output/cells", "../../output/words","../../output/word_letters", "../../output/grid.txt") != 0) {
+    if (run_ocr_recognition("./output/cells", "./output/words","./output/word_letters", "./output/grid.txt") != 0) {
         gtk_label_set_text(GTK_LABEL(app->message_label), "✗ OCR failed");
         gtk_widget_set_name(app->message_label, "message_error");
         fprintf(stderr, "✗ OCR failed\n");
@@ -331,12 +331,12 @@ int launch_solving(char *image_path, gpointer user_data)
     printf("════════════════════════════════════════\n");
 
     printf("\n[SOLVER] Loading grid from: output/grid.txt\n");
-    read_grid("../../output/grid.txt");
+    read_grid("./output/grid.txt");
     printf("[SOLVER] Grid loaded: %d rows × %d cols\n", rows, cols);
 
     printf("[SOLVER] Loading words from: output/words.txt\n");
 
-    FILE* words_file = fopen("../../output/words.txt", "r");
+    FILE* words_file = fopen("./output/words.txt", "r");
     if (!words_file) {
         fprintf(stderr, "[SOLVER] ⚠️  Warning: output/words.txt not found\n");        
     } 

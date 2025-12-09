@@ -10,15 +10,13 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-// ---------- Basic pixel helpers ----------
-
 static inline bool is_black(uint32_t px) {
     return ((px & 0x00FFFFFF) == 0);
 }
 
 static inline uint32_t get_pixel(SDL_Surface* s, int x, int y) {
     if (x < 0 || y < 0 || x >= s->w || y >= s->h)
-        return 0xFFFFFFFF; // white background
+        return 0xFFFFFFFF;
     uint8_t* base = (uint8_t*)s->pixels;
     uint32_t* row = (uint32_t*)(base + y * s->pitch);
     return row[x];
@@ -31,7 +29,6 @@ static inline void put_pixel(SDL_Surface* s, int x, int y, uint32_t px) {
     row[x] = px;
 }
 
-// ---------- Manual rotation ----------
 
 static SDL_Surface* rotate_surface(SDL_Surface* src, double angle_deg) {
     if (fabs(angle_deg) < 0.01) {
@@ -92,7 +89,6 @@ static SDL_Surface* rotate_surface(SDL_Surface* src, double angle_deg) {
     return dst;
 }
 
-// ---------- Projection profiles ----------
 
 static void build_profile_rows(SDL_Surface* s, int* H) {
     uint8_t* base = (uint8_t*)s->pixels;
@@ -133,7 +129,6 @@ static void smooth_profile(int* P, int N) {
     free(temp);
 }
 
-// ---------- Band/line detection ----------
 
 static int* find_line_positions(const int* prof, int N, int thr, int* out_count) {
     int cap = 128;
@@ -180,7 +175,6 @@ static int median_gap(const int* lines, int count) {
     return sum / (count - 1);
 }
 
-// ---------- Skew detection ----------
 
 static double projection_variance_at_angle(SDL_Surface* bin, double angle_deg) {
     int step = 4;
@@ -258,7 +252,6 @@ static double detect_skew_angle(SDL_Surface* bin) {
     return best_angle;
 }
 
-// ---------- Main extraction with fallback ----------
 
 SDL_Surface* extract_grid(SDL_Surface* bin, int* out_x, int* out_y, int* out_w, int* out_h) {
     if (!bin) return NULL;
@@ -269,10 +262,8 @@ SDL_Surface* extract_grid(SDL_Surface* bin, int* out_x, int* out_y, int* out_w, 
 
     if (SDL_MUSTLOCK(bin)) SDL_LockSurface(bin);
 
-    // Detect skew
     double angle = detect_skew_angle(bin);
 
-    // Rotate if needed
     SDL_Surface* deskewed = NULL;
     
     if (fabs(angle) > 0.5) {
@@ -300,7 +291,7 @@ SDL_Surface* extract_grid(SDL_Surface* bin, int* out_x, int* out_y, int* out_w, 
 
     printf("[extract_grid] Processing image size: %dx%d\n", W, H);
 
-    // TRY STRICT THRESHOLDS FIRST (for clean images like test1_1.jpg)
+    // TRY STRICT THRESHOLDS FIRST
     int thr_row = (int)(0.5 * W);
     int thr_col = (int)(0.5 * H);
 
@@ -310,18 +301,18 @@ SDL_Surface* extract_grid(SDL_Surface* bin, int* out_x, int* out_y, int* out_w, 
 
     printf("[extract_grid] Strict (0.5): %d row lines, %d col lines\n", row_line_count, col_line_count);
 
-    // FALLBACK: if too few lines, try relaxed thresholds with smoothing
+    // FALLBACK: if too few lines try relaxed thresholds with smoothing
     if (row_line_count < 8 || col_line_count < 8) {
         printf("[extract_grid] Insufficient lines, trying relaxed detection with smoothing\n");
         
         free(row_lines);
         free(col_lines);
         
-        // Apply smoothing
+        // smoothing
         smooth_profile(Hprof, H);
         smooth_profile(Vprof, W);
         
-        // Use relaxed thresholds
+        // relaxed thresholds
         thr_row = (int)(0.25 * W);
         thr_col = (int)(0.25 * H);
         
@@ -352,7 +343,6 @@ SDL_Surface* extract_grid(SDL_Surface* bin, int* out_x, int* out_y, int* out_w, 
 
     printf("[extract_grid] Initial bounds: y=[%d,%d] x=[%d,%d]\n", y0, y1, x0, x1);
 
-    // Validate using regularity
     int valid_x1 = x0;
     double tolerance = 0.25;
 
