@@ -20,7 +20,9 @@ SRC = src/gui/main.c \
       src/solver/solver.c \
       src/ocr/letter_recognition.c \
       src/ocr/grid_processor.c \
-      src/ocr/word_processor.c
+      src/ocr/word_processor.c \
+	  src/result/result.c \
+	  src/extraction/slice_grid_no_lines.c
 		
 
 OBJ = $(SRC:.c=.o)

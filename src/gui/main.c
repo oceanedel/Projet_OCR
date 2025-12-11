@@ -478,6 +478,11 @@ int main(int argc, char *argv[]) {
     g_signal_connect(open_btn, "clicked", G_CALLBACK(on_open), &app);
     gtk_box_pack_start(GTK_BOX(header_box), open_btn, FALSE, FALSE, 0);
 
+    GtkWidget *denoise_btn = gtk_button_new_with_label("Denoise");
+    g_signal_connect(denoise_btn, "clicked", G_CALLBACK(denoiser), &app);
+    gtk_box_pack_start(GTK_BOX(header_box), denoise_btn, FALSE, FALSE,0);
+
+
     GtkWidget *left_btn = gtk_button_new_with_label("⟲ -5°");
     g_signal_connect(left_btn, "clicked", G_CALLBACK(on_button_left), &app);
     gtk_box_pack_start(GTK_BOX(header_box), left_btn, FALSE, FALSE, 0);
@@ -499,9 +504,6 @@ int main(int argc, char *argv[]) {
     g_signal_connect(auto_btn, "clicked", G_CALLBACK(on_auto_rotation), &app);
     gtk_box_pack_start(GTK_BOX(header_box), auto_btn, FALSE, FALSE, 0);
 
-    GtkWidget *denoise_btn = gtk_button_new_with_label("Denoise");
-    g_signal_connect(denoise_btn, "clicked", G_CALLBACK(denoiser), &app);
-    gtk_box_pack_start(GTK_BOX(header_box), denoise_btn, FALSE, FALSE,0);
 
 
 

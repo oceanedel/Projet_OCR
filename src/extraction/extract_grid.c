@@ -10,174 +10,30 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+// --- Fonctions de base ---
+
 static inline bool is_black(uint32_t px) {
-    return ((px & 0x00FFFFFF) == 0);
+    uint8_t r = (px >> 16) & 0xFF;
+    uint8_t g = (px >> 8) & 0xFF;
+    uint8_t b = px & 0xFF;
+    // Seuil de noir assez large pour capter les gris foncés
+    return (r < 100 && g < 100 && b < 100);
 }
 
 static inline uint32_t get_pixel(SDL_Surface* s, int x, int y) {
-    if (x < 0 || y < 0 || x >= s->w || y >= s->h)
-        return 0xFFFFFFFF;
-    uint8_t* base = (uint8_t*)s->pixels;
-    uint32_t* row = (uint32_t*)(base + y * s->pitch);
-    return row[x];
+    if (x < 0 || y < 0 || x >= s->w || y >= s->h) return 0xFFFFFFFF;
+    return ((uint32_t*)((uint8_t*)s->pixels + y * s->pitch))[x];
 }
 
 static inline void put_pixel(SDL_Surface* s, int x, int y, uint32_t px) {
     if (x < 0 || y < 0 || x >= s->w || y >= s->h) return;
-    uint8_t* base = (uint8_t*)s->pixels;
-    uint32_t* row = (uint32_t*)(base + y * s->pitch);
-    row[x] = px;
+    ((uint32_t*)((uint8_t*)s->pixels + y * s->pitch))[x] = px;
 }
 
-
-static SDL_Surface* rotate_surface(SDL_Surface* src, double angle_deg) {
-    if (fabs(angle_deg) < 0.01) {
-        SDL_Surface* dup = SDL_CreateRGBSurfaceWithFormat(0, src->w, src->h, 32, SDL_PIXELFORMAT_ARGB8888);
-        SDL_BlitSurface(src, NULL, dup, NULL);
-        return dup;
-    }
-
-    double rad = -angle_deg * M_PI / 180.0;
-    double cs = cos(rad);
-    double sn = sin(rad);
-
-    double corners_x[4] = {0, (double)src->w, (double)src->w, 0};
-    double corners_y[4] = {0, 0, (double)src->h, (double)src->h};
-
-    double min_x = 0, max_x = 0, min_y = 0, max_y = 0;
-    for (int i = 0; i < 4; i++) {
-        double rx = corners_x[i] * cs - corners_y[i] * sn;
-        double ry = corners_x[i] * sn + corners_y[i] * cs;
-        if (i == 0 || rx < min_x) min_x = rx;
-        if (i == 0 || rx > max_x) max_x = rx;
-        if (i == 0 || ry < min_y) min_y = ry;
-        if (i == 0 || ry > max_y) max_y = ry;
-    }
-
-    int new_w = (int)(max_x - min_x + 1);
-    int new_h = (int)(max_y - min_y + 1);
-
-    SDL_Surface* dst = SDL_CreateRGBSurfaceWithFormat(0, new_w, new_h, 32, SDL_PIXELFORMAT_ARGB8888);
-    SDL_FillRect(dst, NULL, 0xFFFFFFFF);
-
-    if (SDL_MUSTLOCK(src)) SDL_LockSurface(src);
-    if (SDL_MUSTLOCK(dst)) SDL_LockSurface(dst);
-
-    double cx_src = src->w / 2.0;
-    double cy_src = src->h / 2.0;
-    double cx_dst = new_w / 2.0;
-    double cy_dst = new_h / 2.0;
-
-    for (int y = 0; y < new_h; y++) {
-        for (int x = 0; x < new_w; x++) {
-            double dx = x - cx_dst;
-            double dy = y - cy_dst;
-            double sx = dx * cs + dy * sn + cx_src;
-            double sy = -dx * sn + dy * cs + cy_src;
-
-            int ix = (int)(sx + 0.5);
-            int iy = (int)(sy + 0.5);
-
-            uint32_t px = get_pixel(src, ix, iy);
-            put_pixel(dst, x, y, px);
-        }
-    }
-
-    if (SDL_MUSTLOCK(src)) SDL_UnlockSurface(src);
-    if (SDL_MUSTLOCK(dst)) SDL_UnlockSurface(dst);
-
-    return dst;
-}
-
-
-static void build_profile_rows(SDL_Surface* s, int* H) {
-    uint8_t* base = (uint8_t*)s->pixels;
-    int pitch = s->pitch;
-
-    for (int y = 0; y < s->h; y++) {
-        uint32_t* row = (uint32_t*)(base + y * pitch);
-        int cnt = 0;
-        for (int x = 0; x < s->w; x++) {
-            if (is_black(row[x])) cnt++;
-        }
-        H[y] = cnt;
-    }
-}
-
-static void build_profile_cols(SDL_Surface* s, int* V) {
-    uint8_t* base = (uint8_t*)s->pixels;
-    int pitch = s->pitch;
-
-    for (int x = 0; x < s->w; x++) {
-        int cnt = 0;
-        for (int y = 0; y < s->h; y++) {
-            uint32_t* row = (uint32_t*)(base + y * pitch);
-            if (is_black(row[x])) cnt++;
-        }
-        V[x] = cnt;
-    }
-}
-
-static void smooth_profile(int* P, int N) {
-    if (N < 3) return;
-    int* temp = (int*)malloc(sizeof(int) * N);
-    memcpy(temp, P, sizeof(int) * N);
-    
-    for (int i = 1; i < N - 1; i++) {
-        P[i] = (temp[i-1] + temp[i] + temp[i+1]) / 3;
-    }
-    free(temp);
-}
-
-
-static int* find_line_positions(const int* prof, int N, int thr, int* out_count) {
-    int cap = 128;
-    int* bands = (int*)malloc(sizeof(int) * cap);
-    int count = 0;
-    int in_band = 0, band_start = 0;
-
-    for (int i = 0; i < N; i++) {
-        if (prof[i] >= thr) {
-            if (!in_band) {
-                band_start = i;
-                in_band = 1;
-            }
-        } else if (in_band) {
-            int pos = (band_start + i - 1) / 2;
-            if (count == cap) {
-                cap *= 2;
-                bands = (int*)realloc(bands, sizeof(int) * cap);
-            }
-            bands[count++] = pos;
-            in_band = 0;
-        }
-    }
-
-    if (in_band) {
-        int pos = (band_start + N - 1) / 2;
-        if (count == cap) {
-            cap *= 2;
-            bands = (int*)realloc(bands, sizeof(int) * cap);
-        }
-        bands[count++] = pos;
-    }
-
-    *out_count = count;
-    return bands;
-}
-
-static int median_gap(const int* lines, int count) {
-    if (count < 2) return 0;
-    int sum = 0;
-    for (int i = 0; i < count - 1; i++) {
-        sum += (lines[i + 1] - lines[i]);
-    }
-    return sum / (count - 1);
-}
-
+// --- Rotation (Idem) ---
 
 static double projection_variance_at_angle(SDL_Surface* bin, double angle_deg) {
-    int step = 4;
+    int step = 8; // On scanne moins de pixels pour aller plus vite
     int dsW = bin->w / step;
     int dsH = bin->h / step;
     if (dsW <= 0 || dsH <= 0) return 0.0;
@@ -187,39 +43,24 @@ static double projection_variance_at_angle(SDL_Surface* bin, double angle_deg) {
     double sn = sin(rad);
 
     int* prof = (int*)calloc(dsH, sizeof(int));
-
-    double cx = dsW / 2.0;
-    double cy = dsH / 2.0;
+    double cx = dsW / 2.0, cy = dsH / 2.0;
 
     for (int y = 0; y < dsH; y++) {
         for (int x = 0; x < dsW; x++) {
-            double xr = x - cx;
-            double yr = y - cy;
-
-            double rx = xr * cs - yr * sn + cx;
-            double ry = xr * sn + yr * cs + cy;
-
+            double rx = (x - cx) * cs - (y - cy) * sn + cx;
+            double ry = (x - cx) * sn + (y - cy) * cs + cy;
             int ix = (int)(rx * step + 0.5);
             int iy = (int)(ry * step + 0.5);
-
             if (ix >= 0 && iy >= 0 && ix < bin->w && iy < bin->h) {
-                uint32_t px = get_pixel(bin, ix, iy);
-                if (is_black(px)) prof[y]++;
+                if (is_black(get_pixel(bin, ix, iy))) prof[y]++;
             }
         }
     }
-
-    double mean = 0.0;
+    double mean = 0.0, var = 0.0;
     for (int i = 0; i < dsH; i++) mean += prof[i];
     mean /= (double)dsH;
-
-    double var = 0.0;
-    for (int i = 0; i < dsH; i++) {
-        double d = prof[i] - mean;
-        var += d * d;
-    }
+    for (int i = 0; i < dsH; i++) var += (prof[i] - mean) * (prof[i] - mean);
     var /= (double)dsH;
-
     free(prof);
     return var;
 }
@@ -227,172 +68,254 @@ static double projection_variance_at_angle(SDL_Surface* bin, double angle_deg) {
 static double detect_skew_angle(SDL_Surface* bin) {
     double best_angle = 0.0;
     double best_var = projection_variance_at_angle(bin, 0.0);
-    double var_at_zero = best_var;
-
-    for (double a = -10.0; a <= 10.0; a += 0.5) {
-        if (fabs(a) < 0.1) continue;
-        
+    
+    // Recherche restreinte (-5 à +5 degrés suffisent souvent)
+    for (double a = -5.0; a <= 5.0; a += 1.0) {
+        if (a == 0.0) continue;
         double v = projection_variance_at_angle(bin, a);
-        if (v > best_var) {
-            best_var = v;
-            best_angle = a;
+        if (v > best_var) { best_var = v; best_angle = a; }
+    }
+    // Raffinement
+    double center = best_angle;
+    for (double a = center - 0.5; a <= center + 0.5; a += 0.1) {
+        double v = projection_variance_at_angle(bin, a);
+        if (v > best_var) { best_var = v; best_angle = a; }
+    }
+    printf("[extract_grid] Detected Skew: %.2f degrees\n", best_angle);
+    return best_angle;
+}
+
+static SDL_Surface* rotate_surface(SDL_Surface* src, double angle_deg) {
+    if (fabs(angle_deg) < 0.1) {
+        SDL_Surface* dup = SDL_CreateRGBSurfaceWithFormat(0, src->w, src->h, 32, SDL_PIXELFORMAT_ARGB8888);
+        SDL_BlitSurface(src, NULL, dup, NULL);
+        return dup;
+    }
+    double rad = -angle_deg * M_PI / 180.0;
+    double cs = cos(rad);
+    double sn = sin(rad);
+    int new_w = (int)(fabs(src->w * cs) + fabs(src->h * sn));
+    int new_h = (int)(fabs(src->w * sn) + fabs(src->h * cs));
+    
+    SDL_Surface* dst = SDL_CreateRGBSurfaceWithFormat(0, new_w, new_h, 32, SDL_PIXELFORMAT_ARGB8888);
+    SDL_FillRect(dst, NULL, 0xFFFFFFFF);
+
+    if (SDL_MUSTLOCK(src)) SDL_LockSurface(src);
+    if (SDL_MUSTLOCK(dst)) SDL_LockSurface(dst);
+
+    double cx_src = src->w / 2.0, cy_src = src->h / 2.0;
+    double cx_dst = new_w / 2.0, cy_dst = new_h / 2.0;
+
+    for (int y = 0; y < new_h; y++) {
+        for (int x = 0; x < new_w; x++) {
+            double dx = x - cx_dst;
+            double dy = y - cy_dst;
+            double src_x = dx * cs + dy * sn + cx_src;
+            double src_y = -dx * sn + dy * cs + cy_src;
+            if (src_x >= 0 && src_x < src->w && src_y >= 0 && src_y < src->h) {
+                put_pixel(dst, x, y, get_pixel(src, (int)src_x, (int)src_y));
+            }
+        }
+    }
+    if (SDL_MUSTLOCK(src)) SDL_UnlockSurface(src);
+    if (SDL_MUSTLOCK(dst)) SDL_UnlockSurface(dst);
+    return dst;
+}
+
+// --- NOUVELLE LOGIQUE : Smearing (Dilatation) ---
+
+// Applique une "bavure" horizontale et verticale sur une copie de travail
+// Cela permet de connecter les lettres entre elles pour former un gros bloc,
+// sans abîmer l'image originale.
+static SDL_Surface* create_smeared_map(SDL_Surface* src, int radius_x, int radius_y) {
+    SDL_Surface* temp = SDL_CreateRGBSurfaceWithFormat(0, src->w, src->h, 32, SDL_PIXELFORMAT_ARGB8888);
+    SDL_FillRect(temp, NULL, 0xFFFFFFFF);
+    
+    if (SDL_MUSTLOCK(src)) SDL_LockSurface(src);
+    if (SDL_MUSTLOCK(temp)) SDL_LockSurface(temp);
+
+    uint32_t black = SDL_MapRGB(temp->format, 0, 0, 0);
+
+    // 1. Smear Horizontal
+    for (int y = 0; y < src->h; y++) {
+        int run = 0;
+        for (int x = 0; x < src->w; x++) {
+            if (is_black(get_pixel(src, x, y))) {
+                run = radius_x; // On recharge le "crayon"
+            }
+            if (run > 0) {
+                put_pixel(temp, x, y, black);
+                run--;
+            }
+        }
+        // Scan inverse (droite vers gauche) pour boucher les trous
+        run = 0;
+        for (int x = src->w - 1; x >= 0; x--) {
+            if (is_black(get_pixel(src, x, y))) run = radius_x;
+            if (run > 0) { put_pixel(temp, x, y, black); run--; }
         }
     }
 
-    double improvement = (best_var - var_at_zero) / var_at_zero;
-    
-    if (improvement < 0.05) {
-        printf("[extract_grid] No significant skew detected (improvement: %.1f%%), skipping rotation\n", 
-               improvement * 100.0);
-        return 0.0;
+    // 2. Smear Vertical (sur le résultat horizontal)
+    // On fait une copie temporaire pour ne pas lire ce qu'on vient d'écrire
+    SDL_Surface* res = SDL_CreateRGBSurfaceWithFormat(0, src->w, src->h, 32, SDL_PIXELFORMAT_ARGB8888);
+    SDL_FillRect(res, NULL, 0xFFFFFFFF);
+    if (SDL_MUSTLOCK(res)) SDL_LockSurface(res);
+
+    for (int x = 0; x < src->w; x++) {
+        int run = 0;
+        for (int y = 0; y < src->h; y++) {
+            if (is_black(get_pixel(temp, x, y))) run = radius_y;
+            if (run > 0) { put_pixel(res, x, y, black); run--; }
+        }
+        run = 0;
+        for (int y = src->h - 1; y >= 0; y--) {
+            if (is_black(get_pixel(temp, x, y))) run = radius_y;
+            if (run > 0) { put_pixel(res, x, y, black); run--; }
+        }
     }
 
-    printf("[extract_grid] Estimated skew angle: %.2f degrees (improvement: %.1f%%)\n", 
-           best_angle, improvement * 100.0);
-    return best_angle;
+    if (SDL_MUSTLOCK(src)) SDL_UnlockSurface(src);
+    if (SDL_MUSTLOCK(temp)) SDL_UnlockSurface(temp);
+    if (SDL_MUSTLOCK(res)) SDL_UnlockSurface(res);
+    
+    SDL_FreeSurface(temp);
+    return res;
+}
+
+// Analyse le profil d'une image "smeared" pour trouver le plus grand bloc
+static void find_largest_block_range(int* prof, int N, int* start, int* end) {
+    int max_len = 0;
+    int cur_len = 0;
+    int cur_start = -1;
+    int best_start = 0;
+    int best_end = N;
+
+    // Seuil de détection: sur l'image smeared, c'est presque tout noir (haute densité)
+    // Mais on prend > 0 pour attraper tout le bloc.
+    for (int i = 0; i < N; i++) {
+        if (prof[i] > 0) {
+            if (cur_start == -1) cur_start = i;
+            cur_len++;
+        } else {
+            if (cur_start != -1) {
+                // Fin d'un bloc
+                if (cur_len > max_len) {
+                    max_len = cur_len;
+                    best_start = cur_start;
+                    best_end = i;
+                }
+                cur_start = -1;
+                cur_len = 0;
+            }
+        }
+    }
+    // Check fin de tableau
+    if (cur_start != -1 && cur_len > max_len) {
+        max_len = cur_len;
+        best_start = cur_start;
+        best_end = N;
+    }
+
+    *start = best_start;
+    *end = best_end;
 }
 
 
 SDL_Surface* extract_grid(SDL_Surface* bin, int* out_x, int* out_y, int* out_w, int* out_h) {
     if (!bin) return NULL;
-    if (bin->format->format != SDL_PIXELFORMAT_ARGB8888) {
-        fprintf(stderr, "[extract_grid] ERROR: expected ARGB8888\n");
-        return NULL;
-    }
 
-    if (SDL_MUSTLOCK(bin)) SDL_LockSurface(bin);
-
+    // 1. Rotation
     double angle = detect_skew_angle(bin);
+    SDL_Surface* work;
+    if (fabs(angle) > 0.5) work = rotate_surface(bin, angle);
+    else {
+        work = SDL_CreateRGBSurfaceWithFormat(0, bin->w, bin->h, 32, SDL_PIXELFORMAT_ARGB8888);
+        SDL_BlitSurface(bin, NULL, work, NULL);
+    }
 
-    SDL_Surface* deskewed = NULL;
+    // 2. Création de la "Smeared Map"
+    // On dilate fortement (ex: 20px) pour relier les lettres et le cadre
+    // Cela transforme la grille en un gros rectangle noir solide
+    // Les oiseaux restent des "taches" séparées si ils sont un peu éloignés
+    printf("[extract_grid] Generating smeared map for detection...\n");
+    int smear_radius = (work->w / 50); // environ 2% de la largeur
+    if (smear_radius < 5) smear_radius = 5;
     
-    if (fabs(angle) > 0.5) {
-        if (SDL_MUSTLOCK(bin)) SDL_UnlockSurface(bin);
-        deskewed = rotate_surface(bin, angle);
-        if (!deskewed) {
-            fprintf(stderr, "[extract_grid] ERROR: rotation failed\n");
-            return NULL;
-        }
-    } else {
-        if (SDL_MUSTLOCK(bin)) SDL_UnlockSurface(bin);
-        deskewed = SDL_CreateRGBSurfaceWithFormat(0, bin->w, bin->h, 32, SDL_PIXELFORMAT_ARGB8888);
-        SDL_BlitSurface(bin, NULL, deskewed, NULL);
-    }
+    SDL_Surface* smeared = create_smeared_map(work, smear_radius, smear_radius);
+    
+    // Décommenter pour debug : 
+    // SDL_SaveBMP(smeared, "debug_smeared.bmp");
 
-    if (SDL_MUSTLOCK(deskewed)) SDL_LockSurface(deskewed);
-
-    int W = deskewed->w;
-    int H = deskewed->h;
-    int* Hprof = (int*)calloc(H, sizeof(int));
-    int* Vprof = (int*)calloc(W, sizeof(int));
-
-    build_profile_rows(deskewed, Hprof);
-    build_profile_cols(deskewed, Vprof);
-
-    printf("[extract_grid] Processing image size: %dx%d\n", W, H);
-
-    // TRY STRICT THRESHOLDS FIRST
-    int thr_row = (int)(0.5 * W);
-    int thr_col = (int)(0.5 * H);
-
-    int row_line_count = 0, col_line_count = 0;
-    int* row_lines = find_line_positions(Hprof, H, thr_row, &row_line_count);
-    int* col_lines = find_line_positions(Vprof, W, thr_col, &col_line_count);
-
-    printf("[extract_grid] Strict (0.5): %d row lines, %d col lines\n", row_line_count, col_line_count);
-
-    // FALLBACK: if too few lines try relaxed thresholds with smoothing
-    if (row_line_count < 8 || col_line_count < 8) {
-        printf("[extract_grid] Insufficient lines, trying relaxed detection with smoothing\n");
-        
-        free(row_lines);
-        free(col_lines);
-        
-        // smoothing
-        smooth_profile(Hprof, H);
-        smooth_profile(Vprof, W);
-        
-        // relaxed thresholds
-        thr_row = (int)(0.25 * W);
-        thr_col = (int)(0.25 * H);
-        
-        row_lines = find_line_positions(Hprof, H, thr_row, &row_line_count);
-        col_lines = find_line_positions(Vprof, W, thr_col, &col_line_count);
-        
-        printf("[extract_grid] Relaxed (0.25): %d row lines, %d col lines\n", row_line_count, col_line_count);
-    }
-
-    if (row_line_count < 2 || col_line_count < 2) {
-        printf("[extract_grid] Insufficient grid lines\n");
-        free(Hprof); free(Vprof);
-        free(row_lines); free(col_lines);
-        if (SDL_MUSTLOCK(deskewed)) SDL_UnlockSurface(deskewed);
-        SDL_FreeSurface(deskewed);
-        return NULL;
-    }
-
-    int avg_cell_height = median_gap(row_lines, row_line_count);
-    int avg_cell_width  = median_gap(col_lines, col_line_count);
-
-    printf("[extract_grid] Average cell size: %dx%d\n", avg_cell_width, avg_cell_height);
-
-    int y0 = row_lines[0];
-    int y1 = row_lines[row_line_count - 1];
-    int x0 = col_lines[0];
-    int x1 = col_lines[col_line_count - 1];
-
-    printf("[extract_grid] Initial bounds: y=[%d,%d] x=[%d,%d]\n", y0, y1, x0, x1);
-
-    int valid_x1 = x0;
-    double tolerance = 0.25;
-
-    for (int i = 1; i < col_line_count; i++) {
-        int gap = col_lines[i] - col_lines[i - 1];
-        double ratio = (double)gap / (double)avg_cell_width;
-
-        if (ratio >= (1.0 - tolerance) && ratio <= (1.0 + tolerance)) {
-            valid_x1 = col_lines[i];
-        } else {
-            printf("[extract_grid] Irregular gap at col %d: %d px (expected ~%d)\n",
-                   i, gap, avg_cell_width);
-            break;
+    // 3. Projection Verticale (X) sur la map smeared
+    int* Vprof = (int*)calloc(work->w, sizeof(int));
+    if (SDL_MUSTLOCK(smeared)) SDL_LockSurface(smeared);
+    
+    for (int x = 0; x < smeared->w; x++) {
+        for (int y = 0; y < smeared->h; y++) {
+            if (is_black(get_pixel(smeared, x, y))) Vprof[x]++;
         }
     }
 
-    x1 = valid_x1;
+    // Trouver la zone X la plus large (la grille est généralement le plus gros objet)
+    int gx0, gx1;
+    find_largest_block_range(Vprof, smeared->w, &gx0, &gx1);
+    free(Vprof);
+    
+    printf("[extract_grid] Found X range: %d -> %d\n", gx0, gx1);
 
-    free(Hprof); free(Vprof);
-    free(row_lines); free(col_lines);
+    // 4. Projection Horizontale (Y) MAIS restreinte à la zone X trouvée
+    int* Hprof = (int*)calloc(work->h, sizeof(int));
+    for (int y = 0; y < smeared->h; y++) {
+        // On ne regarde que dans la colonne identifiée
+        for (int x = gx0; x < gx1; x++) {
+            if (is_black(get_pixel(smeared, x, y))) Hprof[y]++;
+        }
+    }
+    if (SDL_MUSTLOCK(smeared)) SDL_UnlockSurface(smeared);
 
-    if (SDL_MUSTLOCK(deskewed)) SDL_UnlockSurface(deskewed);
+    // Trouver la zone Y la plus haute dans cette colonne
+    int gy0, gy1;
+    find_largest_block_range(Hprof, smeared->h, &gy0, &gy1);
+    free(Hprof);
 
-    int gw = x1 - x0 + 1;
-    int gh = y1 - y0 + 1;
+    printf("[extract_grid] Found Y range: %d -> %d\n", gy0, gy1);
 
-    if (gw <= 0 || gh <= 0) {
-        fprintf(stderr, "[extract_grid] ERROR: invalid dimensions\n");
-        SDL_FreeSurface(deskewed);
+    SDL_FreeSurface(smeared); // On n'a plus besoin de la map moche
+
+    // 5. Raffinement et Crop
+    // On a maintenant les coordonnées brutes du "plus gros bloc"
+    // C'est souvent le cadre noir extérieur.
+    
+    // Si on veut supprimer le cadre noir lui-même pour ne garder que l'intérieur,
+    // on peut scanner vers l'intérieur depuis les bords trouvés.
+    // Pour l'instant, on prend le bloc tel quel, le découpage des cases gèrera le reste.
+    
+    // Petit padding de sécurité inverse (on rentre un peu dedans pour virer le flou du smear)
+    int pad = 5;
+    gx0 += pad; gy0 += pad;
+    gx1 -= pad; gy1 -= pad;
+
+    int w = gx1 - gx0;
+    int h = gy1 - gy0;
+
+    if (w < 50 || h < 50) {
+        fprintf(stderr, "[extract_grid] ✗ Failed to detect valid grid block.\n");
+        SDL_FreeSurface(work);
         return NULL;
     }
 
-    printf("[extract_grid] Final grid at (%d, %d) size %dx%d\n", x0, y0, gw, gh);
+    SDL_Rect src_rect = { gx0, gy0, w, h };
+    SDL_Surface* grid = SDL_CreateRGBSurfaceWithFormat(0, w, h, 32, SDL_PIXELFORMAT_ARGB8888);
+    SDL_FillRect(grid, NULL, 0xFFFFFFFF);
+    SDL_BlitSurface(work, &src_rect, grid, NULL);
 
-    SDL_Rect src_rect = { x0, y0, gw, gh };
-    SDL_Surface* grid = SDL_CreateRGBSurfaceWithFormat(0, gw, gh, 32, SDL_PIXELFORMAT_ARGB8888);
-    if (!grid) {
-        fprintf(stderr, "[extract_grid] ERROR: cannot create grid surface\n");
-        SDL_FreeSurface(deskewed);
-        return NULL;
-    }
+    if (out_x) *out_x = gx0;
+    if (out_y) *out_y = gy0;
+    if (out_w) *out_w = w;
+    if (out_h) *out_h = h;
 
-    SDL_Rect dst_rect = { 0, 0, 0, 0 };
-    SDL_BlitSurface(deskewed, &src_rect, grid, &dst_rect);
-
-    if (out_x) *out_x = x0;
-    if (out_y) *out_y = y0;
-    if (out_w) *out_w = gw;
-    if (out_h) *out_h = gh;
-
-    SDL_FreeSurface(deskewed);
+    SDL_FreeSurface(work);
+    printf("[extract_grid] ✓ Grid extracted successfully (%dx%d)\n", w, h);
     return grid;
 }

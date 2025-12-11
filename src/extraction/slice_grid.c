@@ -1,5 +1,4 @@
 
-
 #include "slice_grid.h"
 #include <stdio.h>
 #include <stdlib.h>

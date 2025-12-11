@@ -3,322 +3,205 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+// --- Configuration ---
+// Espace minimum de pixels vides pour considérer qu'un mot est fini.
+// Garde "H E L L O" ensemble.
+#define MIN_WORD_GAP 25 
+
+// Marge blanche (en pixels) à ajouter autour de chaque mot extrait
+#define PADDING 5
+
+// --- Fonctions utilitaires ---
+
 static inline bool is_black(uint32_t px) {
-    return ((px & 0x00FFFFFF) == 0);
+    uint8_t r = (px >> 16) & 0xFF;
+    uint8_t g = (px >> 8) & 0xFF;
+    uint8_t b = px & 0xFF;
+    return (r < 200 && g < 200 && b < 200);
 }
 
 typedef struct {
-    int y_start, y_end;
-} TextRow;
+    int y_start;
+    int y_end;
+} LineSegment;
 
-typedef struct {
-    int x, y, w, h;
-} Word;
+// --- Détection des lignes (Axe Y) ---
 
-// Forward declaration
-static TextRow* split_large_block(int* row_black, int start_y, int end_y, int threshold, int* out_count);
-
-// Recursive splitting function for large blocks
-static TextRow* split_large_block(int* row_black, int start_y, int end_y, int threshold, int* out_count) {
-    int height = end_y - start_y;
-    
-    TextRow* rows = (TextRow*)malloc(sizeof(TextRow) * 50);
-    int row_count = 0;
-    
-    printf("[slice_words] Splitting block y=%d-%d (height=%d, threshold=%d)\n", 
-           start_y, end_y, height, threshold);
-    
-    bool in_text = false;
-    int row_start = start_y;
-    int gap_height = 0;
-    
-    for (int y = start_y; y < end_y; y++) {
-        if (row_black[y] <= threshold) {
-            gap_height++;
-            
-            if (in_text && gap_height >= 1) {
-                int row_end = y;
-                int h = row_end - row_start;
-                
-                if (h >= 8 && h <= 30) {
-                    // Good size - accept
-                    rows[row_count++] = (TextRow){ row_start, row_end };
-                    printf("[slice_words]   ✓ Sub-row: y=%d-%d (h=%d)\n", row_start, row_end, h);
-                } else if (h > 30 && threshold < 150) {
-                    // Still too large - split recursively with higher threshold
-                    printf("[slice_words]   ↻ Re-splitting y=%d-%d (h=%d)\n", row_start, row_end, h);
-                    int sub_count;
-                    TextRow* sub_rows = split_large_block(row_black, row_start, row_end, threshold + 30, &sub_count);
-                    
-                    for (int i = 0; i < sub_count && row_count < 50; i++) {
-                        rows[row_count++] = sub_rows[i];
-                    }
-                    free(sub_rows);
-                } else if (h < 8) {
-                    printf("[slice_words]   ✗ Sub-row: y=%d-%d (h=%d, too small)\n", row_start, row_end, h);
-                } else {
-                    printf("[slice_words]   ✗ Sub-row: y=%d-%d (h=%d, too large, skipping)\n", row_start, row_end, h);
-                }
-                in_text = false;
-            }
-        } else {
-            gap_height = 0;
-            if (!in_text) {
-                row_start = y;
-                in_text = true;
-            }
-        }
-    }
-    
-    // Handle last sub-block
-    if (in_text) {
-        int h = end_y - row_start;
-        if (h >= 8 && h <= 30) {
-            rows[row_count++] = (TextRow){ row_start, end_y };
-            printf("[slice_words]   ✓ Sub-row: y=%d-%d (h=%d)\n", row_start, end_y, h);
-        } else if (h > 30 && threshold < 150) {
-            printf("[slice_words]   ↻ Re-splitting y=%d-%d (h=%d)\n", row_start, end_y, h);
-            int sub_count;
-            TextRow* sub_rows = split_large_block(row_black, row_start, end_y, threshold + 30, &sub_count);
-            
-            for (int i = 0; i < sub_count && row_count < 50; i++) {
-                rows[row_count++] = sub_rows[i];
-            }
-            free(sub_rows);
-        } else if (h < 8) {
-            printf("[slice_words]   ✗ Final sub-row: y=%d-%d (h=%d, too small)\n", row_start, end_y, h);
-        } else {
-            printf("[slice_words]   ✗ Final sub-row: y=%d-%d (h=%d, too large, skipping)\n", row_start, end_y, h);
-        }
-    }
-    
-    *out_count = row_count;
-    return rows;
-}
-
-// Main row detection function
-static TextRow* find_text_rows(SDL_Surface* img, int* out_count) {
-    int W = img->w, H = img->h;
+static LineSegment* find_text_lines(SDL_Surface* img, int* out_count) {
+    int W = img->w;
+    int H = img->h;
     uint8_t* base = (uint8_t*)img->pixels;
     int pitch = img->pitch;
-    
-    if (SDL_MUSTLOCK(img)) SDL_LockSurface(img);
-    
-    int* row_black = (int*)calloc(H, sizeof(int));
-    
+
+    int* proj_y = (int*)calloc(H, sizeof(int));
     for (int y = 0; y < H; y++) {
-        uint32_t* row = (uint32_t*)(base + y * pitch);
-        int black_count = 0;
         for (int x = 0; x < W; x++) {
-            if (is_black(row[x])) black_count++;
+            uint32_t px = ((uint32_t*)(base + y * pitch))[x];
+            if (is_black(px)) {
+                proj_y[y]++;
+            }
         }
-        row_black[y] = black_count;
     }
+
+    LineSegment* lines = (LineSegment*)malloc(sizeof(LineSegment) * 100);
+    int count = 0;
     
-    TextRow* rows = (TextRow*)malloc(sizeof(TextRow) * 50);
-    int row_count = 0;
-    
-    bool in_text = false;
-    int row_start = 0;
-    int gap_height = 0;
-    int min_gap_height = 2;
-    
+    bool inside_line = false;
+    int start_y = 0;
+    int empty_gap = 0;
+    int min_gap_tolerance = 1;
+
     for (int y = 0; y < H; y++) {
-        if (row_black[y] <= 2) {
-            gap_height++;
-            
-            if (in_text && gap_height >= min_gap_height) {
-                int row_end = y - gap_height + 1;
-                int height = row_end - row_start;
-                
-                if (height >= 8 && height <= 30) {
-                    // Normal text row
-                    rows[row_count++] = (TextRow){ row_start, row_end };
-                    if (row_count >= 50) break;
-                } else if (height > 30) {
-                    // Large block - split recursively
-                    int sub_count;
-                    TextRow* sub_rows = split_large_block(row_black, row_start, row_end, 40, &sub_count);
-                    
-                    for (int i = 0; i < sub_count && row_count < 50; i++) {
-                        rows[row_count++] = sub_rows[i];
-                    }
-                    free(sub_rows);
-                }
-                in_text = false;
+        bool has_pixels = (proj_y[y] > 0);
+
+        if (has_pixels) {
+            if (!inside_line) {
+                start_y = y;
+                inside_line = true;
             }
+            empty_gap = 0;
         } else {
-            gap_height = 0;
-            if (!in_text) {
-                row_start = y;
-                in_text = true;
+            if (inside_line) {
+                empty_gap++;
+                if (empty_gap > min_gap_tolerance) {
+                    int end_y = y - empty_gap + 1;
+                    if ((end_y - start_y) > 5) {
+                        lines[count].y_start = start_y;
+                        lines[count].y_end = end_y;
+                        count++;
+                        if (count >= 100) break;
+                    }
+                    inside_line = false;
+                }
             }
         }
     }
-    
-    // Handle final block
-    if (in_text) {
-        int height = H - row_start;
-        if (height >= 8 && height <= 30) {
-            rows[row_count++] = (TextRow){ row_start, H };
-        } else if (height > 30) {
-            int sub_count;
-            TextRow* sub_rows = split_large_block(row_black, row_start, H, 40, &sub_count);
-            
-            for (int i = 0; i < sub_count && row_count < 50; i++) {
-                rows[row_count++] = sub_rows[i];
-            }
-            free(sub_rows);
-        }
+    if (inside_line) {
+        lines[count].y_start = start_y;
+        lines[count].y_end = H;
+        count++;
     }
-    
-    printf("[slice_words] Accepted %d text rows total\n", row_count);
-    
-    if (SDL_MUSTLOCK(img)) SDL_UnlockSurface(img);
-    free(row_black);
-    
-    *out_count = row_count;
-    return rows;
+
+    free(proj_y);
+    *out_count = count;
+    return lines;
 }
 
-// Extract individual words from a text row
-static Word* extract_words_from_row(SDL_Surface* img, TextRow row, int* out_count) {
+// --- Extraction des mots (Axe X) avec PADDING ---
+
+static int slice_row_into_words(SDL_Surface* img, LineSegment line, int word_index_start, const char* output_dir) {
     int W = img->w;
     uint8_t* base = (uint8_t*)img->pixels;
     int pitch = img->pitch;
-    
-    if (SDL_MUSTLOCK(img)) SDL_LockSurface(img);
-    
-    Word* words = (Word*)malloc(sizeof(Word) * 20);
-    int word_count = 0;
-    
-    bool in_word = false;
-    int word_start = 0;
-    int consecutive_white = 0;
-    int max_letter_gap = 6;
-    
+
+    int* proj_x = (int*)calloc(W, sizeof(int));
     for (int x = 0; x < W; x++) {
-        int black_in_column = 0;
-        for (int y = row.y_start; y < row.y_end; y++) {
-            uint32_t* row_pixels = (uint32_t*)(base + y * pitch);
-            if (is_black(row_pixels[x])) {
-                black_in_column++;
-            }
-        }
-        
-        if (black_in_column > 0) {
-            if (!in_word) {
-                word_start = x;
-                in_word = true;
-            }
-            consecutive_white = 0;
-        } else {
-            consecutive_white++;
-            
-            if (in_word && consecutive_white > max_letter_gap) {
-                int word_end = x - consecutive_white;
-                int width = word_end - word_start;
-                
-                // Count black pixels for density check
-                int total_black = 0;
-                for (int yy = row.y_start; yy < row.y_end; yy++) {
-                    uint32_t* rr = (uint32_t*)(base + yy * pitch);
-                    for (int xx = word_start; xx < word_end; xx++) {
-                        if (is_black(rr[xx])) total_black++;
-                    }
-                }
-                
-                int area = width * (row.y_end - row.y_start);
-                double density = (area > 0) ? (double)total_black / area : 0;
-                
-                // Filter: reasonable size and density
-                if (width >= 15 && width <= 250 && density >= 0.1 && density <= 0.7) {
-                    words[word_count++] = (Word){ 
-                        word_start, 
-                        row.y_start, 
-                        width, 
-                        row.y_end - row.y_start 
-                    };
-                    if (word_count >= 20) break;
-                }
-                
-                in_word = false;
-                consecutive_white = 0;
+        for (int y = line.y_start; y < line.y_end; y++) {
+            uint32_t px = ((uint32_t*)(base + y * pitch))[x];
+            if (is_black(px)) {
+                proj_x[x]++;
             }
         }
     }
-    
-    // Handle last word in row
-    if (in_word) {
-        int width = W - word_start;
-        if (width >= 15 && width <= 250) {
-            words[word_count++] = (Word){ 
-                word_start, 
-                row.y_start, 
-                width, 
-                row.y_end - row.y_start 
-            };
-        }
-    }
-    
-    if (SDL_MUSTLOCK(img)) SDL_UnlockSurface(img);
-    
-    *out_count = word_count;
-    return words;
-}
 
-// Main function
-int slice_words(SDL_Surface* wordlist, const char* output_dir) {
-    if (!wordlist || !output_dir) return -1;
+    int saved_count = 0;
+    bool inside_word = false;
+    int start_x = 0;
+    int white_gap = 0;
 
-    printf("[slice_words] Analyzing word list: %dx%d\n", wordlist->w, wordlist->h);
-    
-    // Find all text rows
-    int row_count;
-    TextRow* rows = find_text_rows(wordlist, &row_count);
-    
-    if (row_count == 0) {
-        fprintf(stderr, "[slice_words] ERROR: No text rows detected\n");
-        free(rows);
-        return -1;
-    }
-    
-    int total_words = 0;
-    
-    // Extract words from each row
-    for (int r = 0; r < row_count; r++) {
-        int word_count;
-        Word* words = extract_words_from_row(wordlist, rows[r], &word_count);
+    // Helper pour sauvegarder un mot avec marge
+    void save_word(int sx, int ex) {
+        int w = ex - sx;
+        int h = line.y_end - line.y_start;
         
-        // Save each word
-        for (int w = 0; w < word_count; w++) {
-            int margin = 1;
-            int x = (words[w].x > margin) ? words[w].x - margin : 0;
-            int y = (words[w].y > margin) ? words[w].y - margin : 0;
-            int width = words[w].w + 2 * margin;
-            int height = words[w].h + 2 * margin;
+        if (w > 5) {
+            // Rectangle source (l'image originale)
+            SDL_Rect src = { sx, line.y_start, w, h };
             
-            if (x + width > wordlist->w) width = wordlist->w - x;
-            if (y + height > wordlist->h) height = wordlist->h - y;
+            // Dimensions de la destination (taille originale + marge blanche autour)
+            int final_w = w + (PADDING * 2);
+            int final_h = h + (PADDING * 2);
+
+            SDL_Surface* word_s = SDL_CreateRGBSurfaceWithFormat(0, final_w, final_h, 32, SDL_PIXELFORMAT_ARGB8888);
             
-            SDL_Rect src = { x, y, width, height };
-            SDL_Surface* word_surf = SDL_CreateRGBSurfaceWithFormat(0, width, height, 32, SDL_PIXELFORMAT_ARGB8888);
-            SDL_Rect dst = { 0, 0, 0, 0 };
-            SDL_BlitSurface(wordlist, &src, word_surf, &dst);
+            // Remplir tout en blanc d'abord
+            SDL_FillRect(word_s, NULL, SDL_MapRGB(word_s->format, 255, 255, 255));
+            
+            // Position où coller le mot (décalé par le padding)
+            SDL_Rect dst_offset = { PADDING, PADDING, w, h };
+            
+            // Copier le mot au centre
+            SDL_BlitSurface(img, &src, word_s, &dst_offset);
             
             char path[512];
-            snprintf(path, sizeof(path), "%s/w_%02d.bmp", output_dir, total_words);
-            SDL_SaveBMP(word_surf, path);
-            SDL_FreeSurface(word_surf);
+            snprintf(path, sizeof(path), "%s/w_%02d.bmp", output_dir, word_index_start + saved_count);
+            SDL_SaveBMP(word_s, path);
+            SDL_FreeSurface(word_s);
             
-            total_words++;
+            saved_count++;
         }
-        
-        free(words);
     }
+
+    for (int x = 0; x < W; x++) {
+        bool col_has_black = (proj_x[x] > 0);
+
+        if (col_has_black) {
+            if (!inside_word) {
+                start_x = x;
+                inside_word = true;
+            }
+            white_gap = 0;
+        } else {
+            if (inside_word) {
+                white_gap++;
+                if (white_gap > MIN_WORD_GAP) {
+                    int end_x = x - white_gap + 1;
+                    save_word(start_x, end_x);
+                    inside_word = false;
+                }
+            }
+        }
+    }
+    // Dernier mot
+    if (inside_word) {
+        save_word(start_x, W);
+    }
+
+    free(proj_x);
+    return saved_count;
+}
+
+// --- Fonction Principale ---
+
+int slice_words(SDL_Surface* wordlist, const char* output_dir) {
+    if (!wordlist || !output_dir) return -1;
     
-    free(rows);
+    printf("[slice_words] Processing list %dx%d (Padding: %dpx)...\n", wordlist->w, wordlist->h, PADDING);
+
+    if (SDL_MUSTLOCK(wordlist)) SDL_LockSurface(wordlist);
+
+    int line_count = 0;
+    LineSegment* lines = find_text_lines(wordlist, &line_count);
+
+    if (line_count == 0) {
+        fprintf(stderr, "[slice_words] ✗ No text lines detected.\n");
+        if (SDL_MUSTLOCK(wordlist)) SDL_UnlockSurface(wordlist);
+        free(lines);
+        return -1;
+    }
+
+    printf("[slice_words] Detected %d rows of text.\n", line_count);
+
+    int total_words = 0;
+    for (int i = 0; i < line_count; i++) {
+        int added = slice_row_into_words(wordlist, lines[i], total_words, output_dir);
+        total_words += added;
+    }
+
+    if (SDL_MUSTLOCK(wordlist)) SDL_UnlockSurface(wordlist);
+    free(lines);
+
+    printf("[slice_words] ✓ Extraction complete. %d words saved to %s\n", total_words, output_dir);
     
-    printf("[slice_words] ✓ Saved %d words to %s\n", total_words, output_dir);
     return 0;
 }

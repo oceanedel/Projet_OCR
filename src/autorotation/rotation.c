@@ -303,10 +303,10 @@ char *rotate_original_auto(char *path) {
 
   iImage *res = rotate_image(image, angle_deg);
 
-  save_image(res, "../../output/image.bmp");
+  save_image(res, "./output/image.bmp");
 
   free_image(image);
   free_image(res);
 
-  return strdup("../../output/image.bmp");
+  return strdup("./output/image.bmp");
 }

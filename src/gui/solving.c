@@ -16,7 +16,8 @@
 #include "../extraction/slice_letter_word.h"
 #include "../extraction/trim_cells.h"
 #include "../extraction/trim_word_letters.h"
-
+#include "../result/result.h"
+#include "../extraction/slice_grid_no_lines.h"
 
 // Solver wrapper
 #include "../solver/solver.h"
@@ -37,7 +38,7 @@ void clean_output() {
     printf("[CLEANUP] Removing old output files...\n");
     int res;
     res=system("rm -f  ./output/binary.bmp ./output/grid.bmp ./output/solvingwords.bmp  2>/dev/null");
-    res=system("rm -f ./output/grid.txt ./output/words.txt  2>/dev/null");
+    res=system("rm -f ./output/grid.txt ./output/words.txt ./output/grid_before_autorotate.bmp  2>/dev/null");
     
     res=system("rm -f ./output/cells/*.bmp 2>/dev/null");
     res=system("rm -f ./output/words/*.bmp 2>/dev/null");
@@ -207,14 +208,21 @@ int launch_solving(char *image_path, gpointer user_data)
     printf("\n[3/8] Slicing grid into cells...\n");
     mkdir("./output/cells", 0755);
 
-    if (slice_grid(grid, "./output/cells") != 0) {
-        gtk_label_set_text(GTK_LABEL(app->message_label), "✗ Grid slicing failed");
-        gtk_widget_set_name(app->message_label, "message_error");  
-        fprintf(stderr, "✗ Grid slicing failed\n");
-        SDL_FreeSurface(grid);
-        SDL_FreeSurface(binary);
-        SDL_Quit();
-        return EXIT_FAILURE;
+    // Essayer d'abord la méthode "avec quadrillage"
+    int slice_res = slice_grid(grid, "./output/cells");
+
+    if (slice_res != 0) {
+        printf("   ! Grid lines not found, trying 'No-Line' extraction method...\n");
+        // Si ça échoue, essayer la méthode "sans quadrillage"
+        if (slice_grid_no_lines(grid, "./output/cells") != 0) {
+            gtk_label_set_text(GTK_LABEL(app->message_label), "✗ Grid slicing failed ");
+            gtk_widget_set_name(app->message_label, "message_error");  
+            fprintf(stderr, "✗ Grid slicing failed\n");
+            SDL_FreeSurface(grid);
+            SDL_FreeSurface(binary);
+            SDL_Quit();
+            return EXIT_FAILURE;
+        }
     }
 
     SDL_FreeSurface(grid);
@@ -393,12 +401,12 @@ int launch_solving(char *image_path, gpointer user_data)
         if (found_count == word_count) {
             gtk_label_set_text(GTK_LABEL(app->message_label), "SUCCESS! All words found!");
             gtk_widget_set_name(app->message_label, "message_error");
-
+            show_result_window();
             printf("\n🎉 SUCCESS! All words found!\n");
         } else if (found_count > 0) {
             gtk_label_set_text(GTK_LABEL(app->message_label), "Partial success - not all the words found.");
             gtk_widget_set_name(app->message_label, "message_error");
-
+            show_result_window();
             printf("\n⚠️  Partial success - %d/%d words found.\n", found_count, word_count);
         } else {
             gtk_label_set_text(GTK_LABEL(app->message_label), "No words found");
