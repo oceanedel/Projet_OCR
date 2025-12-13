@@ -38,6 +38,8 @@ clean:
 	rm -rf ./output/cells/*.bmp
 	rm -rf ./output/words/*.bmp
 	rm -rf ./output/word_letters/*.bmp
+	rm -rf ./output/words.txt
+	rm -rf ./output/grid.txt
 	@echo "✓ Clean complete"
 
 clean-training:

@@ -35,6 +35,8 @@ void compute_new_dimensions(unsigned int width, unsigned int height,
                             double angle_deg, unsigned int *new_width,
                             unsigned int *new_height)
 {
+
+
   double angle_rad = angle_deg * PI / 180.0;
 
   double cos_theta = fabs(cos(angle_rad));
@@ -300,6 +302,11 @@ char *rotate_original_auto(char *path) {
   }
 
   double angle_deg = determine_rotation_angle(image);
+
+  if (fabs(angle_deg) < 0.5) { 
+      free_image(image);
+      return NULL; // On retourne NULL pour dire "pas de changement"
+  }
 
   iImage *res = rotate_image(image, angle_deg);
 

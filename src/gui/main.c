@@ -212,6 +212,14 @@ static void on_apply_angle(GtkButton *btn, gpointer user_data) {
 static void on_solve(GtkButton *btn, gpointer user_data) {
     (void)btn;
     AppData *app = (AppData*)user_data;
+
+    if (app->pixbuf == NULL) 
+    {
+        gtk_label_set_text(GTK_LABEL(app->message_label), "Error: No image imported!");
+        gtk_widget_set_name(app->message_label, "message_error"); 
+        return;
+    }
+
     gtk_label_set_text(GTK_LABEL(app->message_label), "Grid solving in progress...");
     gtk_widget_set_name(app->message_label, "message_error"); 
 
