@@ -220,9 +220,10 @@ static void on_solve(GtkButton *btn, gpointer user_data) {
         return;
     }
 
+   
     gtk_label_set_text(GTK_LABEL(app->message_label), "Grid solving in progress...");
     gtk_widget_set_name(app->message_label, "message_error"); 
-
+    gtk_widget_queue_draw(app->message_label);
     while (gtk_events_pending()) {
         gtk_main_iteration();
     }
