@@ -61,7 +61,7 @@ output/*.bmp
 output/words/*
 output/word_letters/*
 output/grid.txt
-output/word.txt
+output/words.txt
 
 
 #exec
